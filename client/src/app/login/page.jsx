@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Rocket } from "lucide-react";
+import { getApiBaseUrl } from "../../lib/api";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "./login.css";
 
@@ -37,8 +38,11 @@ function Login() {
     }
 
     // Pre-warm backend connections immediately when login page opens
-    fetch("https://intern-portal-backend-dw9j.onrender.com/", { mode: "no-cors" }).catch(() => {});
-    fetch("http://localhost:5000/", { mode: "no-cors" }).catch(() => {});
+    const warmUrl = getApiBaseUrl();
+    fetch(`${warmUrl}/`, { mode: "no-cors" }).catch(() => {});
+    if (!warmUrl.includes("localhost")) {
+      fetch("http://localhost:5000/", { mode: "no-cors" }).catch(() => {});
+    }
   }, []);
 
   const handleSocialAuth = async (provider) => {
@@ -107,7 +111,7 @@ function Login() {
     setLoading(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://intern-portal-backend-dw9j.onrender.com";
+      const apiUrl = getApiBaseUrl();
 
       const attemptFetch = (url, timeoutMs = 2500) => {
         return new Promise(async (resolve, reject) => {

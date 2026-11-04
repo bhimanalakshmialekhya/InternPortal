@@ -49,8 +49,11 @@ export default function SettingsPage() {
   const [conf, setConf] = useState("")
   const [show, setShow] = useState({ cur: false, nw: false, conf: false })
   const [twoFA, setTwoFA] = useState(false)
+  const [twoFaLoading, setTwoFaLoading] = useState(false)
+  const [twoFaMsg, setTwoFaMsg] = useState("")
   const [pwMsg, setPwMsg] = useState("")
   const [pwErr, setPwErr] = useState("")
+  const [pwLoading, setPwLoading] = useState(false)
 
   useEffect(() => {
     try {
@@ -183,27 +186,53 @@ export default function SettingsPage() {
   const changePw = async () => {
     setPwMsg("")
     setPwErr("")
-    if (!cur) { setPwErr("Enter current password"); return }
-    if (!nw || nw.length < 6) { setPwErr("New password must be at least 6 characters"); return }
-    if (nw !== conf) { setPwErr("Passwords do not match"); return }
+    if (!cur.trim()) { setPwErr("Please enter your current password"); return }
+    if (!nw || nw.length < 6) { setPwErr("New password must be at least 6 characters long"); return }
+    if (nw !== conf) { setPwErr("New password and confirmation do not match"); return }
     const user = getUser()
+    setPwLoading(true)
     try {
-      const res = await fetch("https://intern-portal-backend-dw9j.onrender.com/auth/change-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, currentPassword: cur, newPassword: nw })
+      const res = await api.changePassword({
+        userId: user.id || "",
+        email: user.email || "",
+        currentPassword: cur,
+        newPassword: nw
       })
-      const data = await res.json()
       if (res.ok) {
-        setPwMsg("Saved! Password updated!")
+        setPwMsg(res.data?.message || "Password updated successfully!")
         setCur("")
         setNw("")
         setConf("")
       } else {
-        setPwErr(data.error || "Update failed")
+        setPwErr(res.data?.error || "Update failed. Please verify your current password.")
       }
     } catch {
-      setPwErr("Cannot connect to server.")
+      setPwErr("Cannot connect to server. Please check your backend connection.")
+    } finally {
+      setPwLoading(false)
+    }
+  }
+
+  const handleToggle2FA = async (val) => {
+    setTwoFA(val)
+    setTwoFaLoading(true)
+    setTwoFaMsg("")
+    const user = getUser()
+    try {
+      const res = await api.updateSecuritySettings({
+        userId: user.id || "",
+        email: user.email || "",
+        twoFactorEnabled: val
+      })
+      if (res.ok) {
+        setTwoFaMsg(val ? "Two-Factor Authentication is now enabled." : "Two-Factor Authentication is now disabled.")
+      } else {
+        setTwoFaMsg(res.data?.error || "Failed to update 2FA setting.")
+      }
+    } catch {
+      setTwoFaMsg("Unable to reach server to update 2FA status.")
+    } finally {
+      setTwoFaLoading(false)
     }
   }
 
@@ -444,18 +473,29 @@ export default function SettingsPage() {
             ))}
           </div>
 
-          <div className={`flex items-center justify-between rounded-2xl p-4.5 ${cardBg}`}>
-            <div>
-              <p className="text-sm font-semibold">{t("Two-Factor Authentication")}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{t("Add extra security to your account")}</p>
+          <div className={`flex flex-col gap-2 rounded-2xl p-4.5 ${cardBg}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold">{t("Two-Factor Authentication")}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{t("Add extra security to your account with two-step verification")}</p>
+              </div>
+              <Toggle val={twoFA} onChange={handleToggle2FA} disabled={twoFaLoading} />
             </div>
-            <Toggle val={twoFA} onChange={setTwoFA} />
+            {twoFaMsg && (
+              <p className={`text-xs mt-1 ${twoFaMsg.includes("enabled") || twoFaMsg.includes("active") ? "text-emerald-400" : "text-gray-400"}`}>
+                {twoFaMsg}
+              </p>
+            )}
           </div>
 
           {pwErr && <p className="text-xs text-red-400">⚠️ {pwErr}</p>}
           {pwMsg && <p className="text-xs text-green-400">✓ {pwMsg}</p>}
-          <button onClick={changePw} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 text-sm font-bold text-white shadow-lg hover:opacity-95 transition">
-            <Save size={15} /> {t("Update Password")}
+          <button
+            onClick={changePw}
+            disabled={pwLoading}
+            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 text-sm font-bold text-white shadow-lg hover:opacity-95 transition disabled:opacity-50 cursor-pointer"
+          >
+            <Save size={15} /> {pwLoading ? "Updating..." : t("Update Password")}
           </button>
         </div>
       )
@@ -563,9 +603,8 @@ export default function SettingsPage() {
             <button onClick={async () => {
               if (!confirm("Are you sure? This will permanently delete your account.")) return
               const user = getUser()
-              if (user.id) await fetch(`https://intern-portal-backend-dw9j.onrender.com/auth/profile/${user.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }).catch(() => { })
-              localStorage.removeItem("token")
-              localStorage.removeItem("user")
+              if (user.id) await api.deleteAccount(user.id).catch(() => { })
+              clearUserSession()
               router.push("/signup")
             }} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-500/20 border border-red-500/40 text-red-400 text-xs sm:text-sm font-semibold hover:bg-red-500/30 transition">
               <Trash2 size={14} /> {t("Delete Account")}

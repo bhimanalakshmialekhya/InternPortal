@@ -1,17 +1,29 @@
 // ─── Central API — all frontend calls go through here ────────────────────────
-const BASE = process.env.NEXT_PUBLIC_API_URL || "https://intern-portal-backend-dw9j.onrender.com"
+export function getApiBaseUrl() {
+  if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.trim()) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "")
+  }
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname
+    if (host === "localhost" || host === "127.0.0.1") {
+      return "http://localhost:5000"
+    }
+  }
+  return "https://intern-portal-backend-juxh.onrender.com"
+}
 
 async function req(path, opts = {}) {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+  const base = getApiBaseUrl()
   try {
-    const res = await fetch(`${BASE}${path}`, {
+    const res = await fetch(`${base}${path}`, {
       headers: { "Content-Type":"application/json", ...(token?{Authorization:`Bearer ${token}`}:{}) },
       ...opts,
     })
     const data = await res.json().catch(() => ({}))
     return { ok: res.ok, data, status: res.status }
-  } catch {
-    return { ok: false, data: {}, status: 0 }
+  } catch (err) {
+    return { ok: false, data: { error: "Cannot connect to server" }, status: 0 }
   }
 }
 
@@ -23,15 +35,17 @@ const patch = (p, b) => req(p, { method:"PATCH",  body: JSON.stringify(b) })
 
 export const api = {
   // ── AUTH (shared) ──────────────────────────────────────────────────────────
-  login:         (b)     => post("/auth/login", b),
-  register:      (b)     => post("/auth/register", b),
-  demoLogin:     ()      => get("/auth/demo-login"),
-  oauthStatus:   ()      => get("/auth/oauth/status"),
-  getOAuthUrl:   (p, r)  => get(`/auth/oauth/authorize/${p}?role=${r||"intern"}&format=json`),
-  profile:       (id)    => get(`/auth/profile/${id}`),
-  updateProfile: (id, b) => put(`/auth/profile/${id}`, b),
-  deleteAccount: (id)    => del(`/auth/profile/${id}`),
-  changePassword:(b)     => post("/auth/change-password", b),
+  login:                 (b)     => post("/auth/login", b),
+  register:              (b)     => post("/auth/register", b),
+  demoLogin:             ()      => get("/auth/demo-login"),
+  oauthStatus:           ()      => get("/auth/oauth/status"),
+  getOAuthUrl:           (p, r)  => get(`/auth/oauth/authorize/${p}?role=${r||"intern"}&format=json`),
+  profile:               (id)    => get(`/auth/profile/${id}`),
+  updateProfile:         (id, b) => put(`/auth/profile/${id}`, b),
+  deleteAccount:         (id)    => del(`/auth/profile/${id}`),
+  changePassword:        (b)     => post("/auth/change-password", b),
+  getSecuritySettings:   (p)     => get(`/auth/security-settings?${new URLSearchParams(p || {}).toString()}`),
+  updateSecuritySettings:(b)     => post("/auth/security-settings", b),
 
   // ── INTERN — TASKS (/intern/tasks) ─────────────────────────────────────────
   getTasks:    (uid) => get(`/intern/tasks/${uid?`?userId=${uid}`:""}`),

@@ -37,8 +37,9 @@ import {
 } from "lucide-react"
 import { IconBadge, ActionRow } from "../../../lib/iconBadge"
 import { ResponsiveContainer, AreaChart, Area, Tooltip, CartesianGrid, XAxis, YAxis, BarChart, Bar, PieChart, Pie, Cell } from "recharts"
+import { getApiBaseUrl } from "../../../lib/api"
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || "https://intern-portal-backend-dw9j.onrender.com"
+const BASE = getApiBaseUrl()
 const G = { background:"rgba(17,25,40,0.85)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:"14px" }
 const inp = { background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:"10px", padding:"8px 12px", fontSize:"14px", color:"white", outline:"none", width:"100%" }
 
@@ -1774,7 +1775,7 @@ function MentorSettings({ user, setUser }) {
   const changePw = async () => {
     if (!cur||!nw||nw!==conf){setPwMsg("Check fields");return}
     const u = getUser()
-    const res = await fetch(`${BASE}/auth/change-password`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({userId:u.id,currentPassword:cur,newPassword:nw})}).catch(()=>({ok:false}))
+    const res = await fetch(`${BASE}/auth/change-password`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({userId:u.id,email:u.email,currentPassword:cur,newPassword:nw})}).catch(()=>({ok:false}))
     setPwMsg(res.ok?"Password changed!":"Failed - check current password")
     if(res.ok){setCur("");setNw("");setConf("")}
   }

@@ -5,7 +5,7 @@ import InternSidebar from "../../../lib/internSidebar"
 import { ChevronLeft, ChevronRight, CheckCircle2, Clock, MapPin, Download, X, BarChart2, CalendarCheck, CalendarX, AlarmClock } from "lucide-react"
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts"
 import { ClientChart } from "../../../components/ui/client-chart"
-import { api, getUser } from "../../../lib/api"
+import { api, getUser, getApiBaseUrl } from "../../../lib/api"
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 const DOT = { p:"#22c55e", a:"#ef4444", l:"#f59e0b", v:"#3b82f6" }
@@ -253,7 +253,7 @@ export default function AttendancePage() {
       if (checkInId) {
         // Use sendBeacon for reliability on page close
         const blob = new Blob([JSON.stringify({checkOut:timeStr})], {type:"application/json"})
-        navigator.sendBeacon?.(`https://intern-portal-backend-dw9j.onrender.com/intern/attendance/checkout/${checkInId}`, blob)
+        navigator.sendBeacon?.(`${getApiBaseUrl()}/intern/attendance/checkout/${checkInId}`, blob)
       }
       // Save checkout time to localStorage so it persists
       try {

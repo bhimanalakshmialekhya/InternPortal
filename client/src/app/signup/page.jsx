@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { User, Mail, Shield, Lock, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { getApiBaseUrl } from "../../lib/api";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "./signup.css";
 
@@ -42,8 +43,11 @@ function Signup() {
       }
     }
 
-    fetch("https://intern-portal-backend-dw9j.onrender.com/", { mode: "no-cors" }).catch(() => {});
-    fetch("http://localhost:5000/", { mode: "no-cors" }).catch(() => {});
+    const warmUrl = getApiBaseUrl();
+    fetch(`${warmUrl}/`, { mode: "no-cors" }).catch(() => {});
+    if (!warmUrl.includes("localhost")) {
+      fetch("http://localhost:5000/", { mode: "no-cors" }).catch(() => {});
+    }
   }, []);
 
   const handleSocialAuth = async (provider) => {
@@ -113,7 +117,7 @@ function Signup() {
     setLoading(true);
     setServerError("");
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://intern-portal-backend-dw9j.onrender.com";
+      const apiUrl = getApiBaseUrl();
 
       const cleanFullName = formData.fullName.trim();
       const cleanEmail = formData.email.trim().toLowerCase();

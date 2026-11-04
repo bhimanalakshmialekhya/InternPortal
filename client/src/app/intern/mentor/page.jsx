@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react"
 import InternSidebar from "../../../lib/internSidebar"
 import { Search, MessageSquare, Plus, X, Save, Users, Zap, Calendar, Clock, Sparkles, CheckCircle2, UserCheck, Filter, ArrowRight } from "lucide-react"
-import { api, getUser } from "../../../lib/api"
+import { api, getUser, getApiBaseUrl } from "../../../lib/api"
 import { getAssignedRole, STORAGE_KEY_ROLE } from "../../../lib/assessmentData"
 
 const MENTORS = [
@@ -174,7 +174,7 @@ export default function MentorPage() {
   const addMentor = async () => {
     if (!form.name.trim() || !form.role.trim()) return
     try {
-      await fetch("https://intern-portal-backend-dw9j.onrender.com/mentors/add", {
+      await fetch(`${getApiBaseUrl()}/mentors/add`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form)

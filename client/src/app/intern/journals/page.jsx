@@ -105,6 +105,13 @@ export default function JournalsPage() {
     setShowEditModal(true)
   }
 
+  const openEditWith = (j) => {
+    if (!j) return
+    setSelected(j)
+    setEditJ({ ...j })
+    setShowEditModal(true)
+  }
+
   const handleSaveEdit = async () => {
     if (!editJ.title.trim() || !editJ.workedOn.trim()) {
       alert("Title and 'What I worked on' are required.")
@@ -160,12 +167,23 @@ export default function JournalsPage() {
       setSentIds(ids)
     } catch {}
 
-    // Poll mentor comments
+    // Poll mentor comments and deduplicate
     const pollComments = () => {
       try {
-        const comments = JSON.parse(localStorage.getItem("mentorComments") || "[]")
-        if (!comments.length) return
+        const rawComments = JSON.parse(localStorage.getItem("mentorComments") || "[]")
+        if (!rawComments.length) return
+        
+        // Deduplicate comments by title and time
+        const commentMap = new Map()
+        rawComments.forEach(c => {
+          const key = `${(c.journalTitle || "").trim().toLowerCase()}_${c.mentor || ""}_${c.time || ""}`
+          if (!commentMap.has(key)) {
+            commentMap.set(key, c)
+          }
+        })
+        const comments = Array.from(commentMap.values())
         setMentorComments(comments)
+
         setJournals(prev => prev.map(j => {
           const mc = comments.find(c =>
             c.journalTitle &&
@@ -192,7 +210,7 @@ export default function JournalsPage() {
       } catch {}
     }
     pollComments()
-    const id = setInterval(pollComments, 1500)
+    const id = setInterval(pollComments, 2000)
     return () => clearInterval(id)
   }, [])
 
@@ -203,6 +221,9 @@ export default function JournalsPage() {
   )
 
   const sendToMentor = (journal) => {
+    if (sentIds.has(journal.id) || Boolean(sentSubmissions[String(journal.id)])) {
+      return // Prevent duplicate submissions
+    }
     const user = getInternUser()
     const sub = appendSubmission({
       id: `journal-${journal.id}-${Date.now()}`,
@@ -226,15 +247,20 @@ export default function JournalsPage() {
       alert("Please enter a title and description of what you worked on.")
       return
     }
+    // Prevent duplicate journal titles
+    if (journals.some(j => j.title.trim().toLowerCase() === newJ.title.trim().toLowerCase())) {
+      alert("A journal entry with this title already exists. Please choose a different title.")
+      return
+    }
     const user = getInternUser()
     const now = new Date()
     const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })
     const payload = {
-      title: newJ.title,
-      workedOn: newJ.workedOn,
-      learned: newJ.learned || "Continued progress on milestone modules.",
-      challenges: newJ.challenges || "None reported.",
-      tomorrowPlan: newJ.tomorrow || "Proceed with next sprint deliverable.",
+      title: newJ.title.trim(),
+      workedOn: newJ.workedOn.trim(),
+      learned: newJ.learned.trim() || "Continued progress on milestone modules.",
+      challenges: newJ.challenges.trim() || "None reported.",
+      tomorrowPlan: newJ.tomorrow.trim() || "Proceed with next sprint deliverable.",
       date: dateStr,
       userId: user.id
     }
@@ -354,7 +380,29 @@ export default function JournalsPage() {
                     {j.learned || "Core engineering concepts and implementation."}
                   </p>
 
-                  {/* Row 5: Action Buttons */}
+                  {/* Row 5: Mentor Feedback Summary (Maximum 2 lines) */}
+                  {(() => {
+                    const mc = j.comment || mentorComments.find(c =>
+                      c.journalTitle &&
+                      (c.journalTitle.toLowerCase() === j.title?.toLowerCase() ||
+                       j.title?.toLowerCase().includes(c.journalTitle?.toLowerCase()))
+                    )
+                    if (mc?.text) {
+                      return (
+                        <p className="text-xs text-emerald-300 line-clamp-2 leading-relaxed bg-emerald-950/25 px-2.5 py-1 rounded-lg border border-emerald-500/20 italic">
+                          <strong className="text-emerald-400 font-semibold not-italic">Feedback ({mc.mentor || "Mentor"}): </strong>
+                          "{mc.text}"
+                        </p>
+                      )
+                    }
+                    return (
+                      <p className="text-[11px] text-gray-500 italic">
+                        Feedback: Awaiting mentor review
+                      </p>
+                    )
+                  })()}
+
+                  {/* Row 6: Action Buttons */}
                   <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#1e293b]/60 mt-0.5">
                     <button
                       onClick={(e) => { e.stopPropagation(); setSelected(j) }}
@@ -363,21 +411,31 @@ export default function JournalsPage() {
                       View Details <ArrowRight size={13} />
                     </button>
 
-                    <button
-                      onClick={(e) => { e.stopPropagation(); sendToMentor(j) }}
-                      disabled={isSent}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
-                        isSent
-                          ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 cursor-default"
-                          : "bg-gradient-to-r from-cyan-500 to-purple-600 text-white hover:brightness-110 shadow-sm"
-                      }`}
-                    >
-                      {isSent ? (
-                        <><CheckCircle2 size={13} /> Sent</>
-                      ) : (
-                        <><Send size={13} /> Send to Mentor</>
-                      )}
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openEditWith(j) }}
+                        className="px-2.5 py-1 rounded-lg bg-[#0f172a] border border-[#1e293b] text-xs font-semibold text-gray-300 hover:text-white hover:bg-[#111827] flex items-center gap-1 transition cursor-pointer"
+                        title="Edit journal entry"
+                      >
+                        <Edit size={12} /> Edit
+                      </button>
+
+                      <button
+                        onClick={(e) => { e.stopPropagation(); sendToMentor(j) }}
+                        disabled={isSent}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
+                          isSent
+                            ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 cursor-default"
+                            : "bg-gradient-to-r from-cyan-500 to-purple-600 text-white hover:brightness-110 shadow-sm"
+                        }`}
+                      >
+                        {isSent ? (
+                          <><CheckCircle2 size={12} /> Sent</>
+                        ) : (
+                          <><Send size={12} /> Send</>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )
@@ -433,30 +491,20 @@ export default function JournalsPage() {
 
             {/* Core Section 1: Work Accomplished */}
             <div className="rounded-2xl p-5 bg-[#0f172a]/90 border border-cyan-500/25 shadow-lg">
-              <div className="flex items-center gap-3 mb-3 pb-2.5 border-b border-[#1e293b]">
-                <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center flex-shrink-0">
-                  <Code2 size={18} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">Work Accomplished</h3>
-                  <p className="text-xs text-gray-400">Core engineering output completed today</p>
-                </div>
+              <div className="flex items-center gap-2.5 mb-3 pb-2 border-b border-[#1e293b]">
+                <Code2 size={16} className="text-cyan-400" />
+                <h3 className="text-sm font-bold text-white">Work Accomplished</h3>
               </div>
               <p className="text-sm text-gray-200 leading-relaxed whitespace-pre-line font-normal">
                 {selected.workedOn || "No work details provided."}
               </p>
             </div>
 
-            {/* Core Section 2: Key Learnings & Takeaways */}
+            {/* Core Section 2: Key Learnings */}
             <div className="rounded-2xl p-5 bg-[#0f172a]/90 border border-purple-500/25 shadow-lg">
-              <div className="flex items-center gap-3 mb-3 pb-2.5 border-b border-[#1e293b]">
-                <div className="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center flex-shrink-0">
-                  <Lightbulb size={18} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">Key Learnings & Takeaways</h3>
-                  <p className="text-xs text-gray-400">Concepts, patterns and technologies acquired</p>
-                </div>
+              <div className="flex items-center gap-2.5 mb-3 pb-2 border-b border-[#1e293b]">
+                <Lightbulb size={16} className="text-purple-400" />
+                <h3 className="text-sm font-bold text-white">Key Learnings</h3>
               </div>
               <p className="text-sm text-gray-200 leading-relaxed whitespace-pre-line font-normal">
                 {selected.learned || "No learnings recorded for this entry."}
@@ -469,30 +517,30 @@ export default function JournalsPage() {
                 onClick={() => setShowExtraDetails(prev => !prev)}
                 className="w-full flex items-center justify-between p-4 text-left hover:bg-[#111827] transition cursor-pointer select-none"
               >
-                <div className="flex items-center gap-2.5 text-xs font-bold text-gray-300">
-                  <Compass size={16} className="text-emerald-400" />
-                  <span>Additional Details (Blockers & Next Day Priorities)</span>
+                <div className="flex items-center gap-2 text-xs font-bold text-gray-300">
+                  <Compass size={15} className="text-emerald-400" />
+                  <span>Challenges & Next Day Priorities</span>
                 </div>
-                <div className="w-7 h-7 rounded-lg bg-[#111827] border border-[#1e293b] flex items-center justify-center text-gray-400">
-                  {showExtraDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                <div className="w-6 h-6 rounded-lg bg-[#111827] border border-[#1e293b] flex items-center justify-center text-gray-400">
+                  {showExtraDetails ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                 </div>
               </button>
 
               {showExtraDetails && (
-                <div className="p-4 pt-0 space-y-4 border-t border-[#1e293b]">
+                <div className="p-4 pt-0 space-y-3 border-t border-[#1e293b]">
                   <div className="mt-3">
                     <p className="text-xs font-bold text-pink-400 mb-1 flex items-center gap-1.5">
-                      <AlertTriangle size={13} /> Challenges & Blockers Encountered:
+                      <AlertTriangle size={13} /> Challenges Encountered:
                     </p>
-                    <p className="text-xs sm:text-sm text-gray-300 pl-5 leading-relaxed">
+                    <p className="text-xs sm:text-sm text-gray-300 pl-4 leading-relaxed">
                       {selected.challenges || "No blockers reported."}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs font-bold text-emerald-400 mb-1 flex items-center gap-1.5">
-                      <Compass size={13} /> Tomorrow's Action Plan:
+                      <Compass size={13} /> Tomorrow's Plan:
                     </p>
-                    <p className="text-xs sm:text-sm text-gray-300 pl-5 leading-relaxed">
+                    <p className="text-xs sm:text-sm text-gray-300 pl-4 leading-relaxed">
                       {selected.tomorrow || "Continue with assigned sprint tasks."}
                     </p>
                   </div>
@@ -505,16 +553,13 @@ export default function JournalsPage() {
               (() => {
                 const mc = selected.comment || mentorComments.find(c => c.journalTitle === selected.title)
                 return (
-                  <div className="bg-gradient-to-r from-purple-950/30 to-cyan-950/30 border border-purple-500/40 rounded-2xl p-5 shadow-lg">
-                    <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-[#1e293b]">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 flex items-center justify-center text-xs font-black text-white">
+                  <div className="bg-gradient-to-r from-purple-950/30 to-cyan-950/30 border border-purple-500/40 rounded-2xl p-4.5 shadow-lg">
+                    <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-[#1e293b]">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-gradient-to-r from-cyan-500 to-purple-600 flex items-center justify-center text-xs font-black text-white">
                           {(mc.mentor || "M").charAt(0)}
                         </div>
-                        <div>
-                          <p className="text-xs font-bold text-white">{mc.mentor || "Assigned Mentor"}</p>
-                          <p className="text-[10px] text-purple-300 font-medium">Verified Mentor Review</p>
-                        </div>
+                        <p className="text-xs font-bold text-white">{mc.mentor || "Assigned Mentor"}</p>
                       </div>
                       <span className="text-[10px] text-gray-400">{mc.time}</span>
                     </div>
@@ -525,19 +570,19 @@ export default function JournalsPage() {
                 )
               })()
             ) : (
-              <div className="bg-[#0f172a]/50 border border-dashed border-[#1e293b] rounded-2xl p-5 flex items-center justify-between gap-4 text-xs text-gray-400">
-                <div className="flex items-center gap-2.5">
-                  <Clock size={16} className="text-yellow-400/80" />
+              <div className="bg-[#0f172a]/50 border border-dashed border-[#1e293b] rounded-2xl p-4 flex items-center justify-between gap-4 text-xs text-gray-400">
+                <div className="flex items-center gap-2">
+                  <Clock size={15} className="text-yellow-400/80" />
                   <span>
                     {sentIds.has(selected.id)
-                      ? "Submitted to mentor — awaiting review and evaluation remarks."
+                      ? "Submitted to mentor — awaiting review."
                       : "Draft journal entry — click 'Send to Mentor' to request feedback."}
                   </span>
                 </div>
                 {!sentIds.has(selected.id) && (
                   <button
                     onClick={() => sendToMentor(selected)}
-                    className="px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border border-cyan-500/40 font-semibold cursor-pointer transition flex-shrink-0"
+                    className="px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border border-cyan-500/40 font-semibold cursor-pointer transition flex-shrink-0 text-xs"
                   >
                     Send Now
                   </button>
