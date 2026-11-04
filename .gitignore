@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+client/node_modules/
+.pnpm-store/
+
+# Next.js Build & Cache
+.next/
+client/.next/
+out/
+client/out/
+build/
+client/build/
+.vercel/
+
+# Python & Virtual Environments
+__pycache__/
+server/__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+server/venv/
+server/.venv/
+
+# Environment variables
+.env
+.env*.local
+client/.env
+client/.env*.local
+server/.env
+server/.env*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pip-log.txt
+*.log
+
+# Local tools
+.tools/
+
+# Local databases and runtime stores
+server/data/
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
