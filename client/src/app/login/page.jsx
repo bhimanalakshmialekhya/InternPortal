@@ -320,24 +320,6 @@ function Login() {
                   <i className="fa-brands fa-github"></i>
                 )}
               </button>
-
-              <button
-                type="button"
-                className="social-btn"
-                onClick={() => handleSocialAuth("linkedin")}
-                disabled={Boolean(socialLoading) || loading}
-                title="Sign in with LinkedIn"
-                style={{
-                  cursor: socialLoading ? "not-allowed" : "pointer",
-                  opacity: socialLoading && socialLoading !== "linkedin" ? 0.4 : 1
-                }}
-              >
-                {socialLoading === "linkedin" ? (
-                  <i className="fa-solid fa-spinner fa-spin"></i>
-                ) : (
-                  <i className="fa-brands fa-linkedin-in"></i>
-                )}
-              </button>
             </div>
             <p className="signup-link">
               Don't have an account? <Link href="/signup">Sign Up</Link>
