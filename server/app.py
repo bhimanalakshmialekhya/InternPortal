@@ -27,12 +27,12 @@ from institution.routes.institution_routes import inst_bp
 
 app = Flask(__name__)
 
-# CORS (production safe)
-CORS(app, resources={r"/*": {"origins": [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://intern-portal-e483.vercel.app"
-]}})
+# CORS (production safe for all origins including Vercel and localhost)
+CORS(app, resources={r"/*": {
+    "origins": "*",
+    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"]
+}})
 
 # Register blueprints
 app.register_blueprint(ai_bp, url_prefix="/ai")
