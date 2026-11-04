@@ -1,10 +1,8 @@
 :root {
-  --primary-gradient: linear-gradient(
-    135deg,
-    #ff6ec7,
-    #8b5cf6,
-    #3b82f6
-  );
+  --primary-gradient: linear-gradient(135deg,
+      #ff6ec7,
+      #8b5cf6,
+      #3b82f6);
   --glass-bg: rgba(255, 255, 255, 0.04);
   --text-dim: #d1d5db;
 }
@@ -44,10 +42,12 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: 1.1fr 1fr; 
+  grid-template-columns: 1.1fr 1fr;
   width: 100%;
-  max-width: 940px;  /* Increased from 840px for a larger, premium width */
-  min-height: 580px; /* Increased from 520px to scale overall card height */
+  max-width: 940px;
+  /* Increased from 840px for a larger, premium width */
+  min-height: 580px;
+  /* Increased from 520px to scale overall card height */
   background: rgba(15, 15, 25, 0.5);
   backdrop-filter: blur(20px);
   border-radius: 24px;
@@ -62,6 +62,7 @@
     opacity: 0;
     transform: translateY(25px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -75,23 +76,26 @@
   flex-direction: column;
   justify-content: center;
   background: rgba(20, 20, 30, 0.4);
-  position: relative; /* needed for back button absolute positioning */
+  position: relative;
+  /* needed for back button absolute positioning */
 }
 
 .error-border {
   border-color: #ef4444 !important;
-  box-shadow: 0 0 8px rgba(239,68,68,0.3) !important;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.3) !important;
 }
 
 /* Header Spacing */
 .signup-header {
   text-align: center;
-  margin-bottom: 16px; /* Tighter baseline spacing */
+  margin-bottom: 16px;
+  /* Tighter baseline spacing */
 }
 
 .signup-header h1 {
   color: white;
-  font-size: 22px; /* Slightly lowered header size */
+  font-size: 22px;
+  /* Slightly lowered header size */
   margin-bottom: 4px;
 }
 
@@ -103,13 +107,15 @@
 /* Tighter, Slimmer Fields */
 .input-group {
   position: relative;
-  margin-bottom: 10px; /* Reduced layout margin gap from 12px+ */
+  margin-bottom: 10px;
+  /* Reduced layout margin gap from 12px+ */
 }
 
 .input-group input,
 .input-group select {
   width: 100%;
-  padding: 10px 42px; /* Made inputs less thick vertically (14px down to 10px) */
+  padding: 10px 42px;
+  /* Made inputs less thick vertically (14px down to 10px) */
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.05);
@@ -118,8 +124,10 @@
   outline: none;
   transition: 0.3s;
   appearance: none;
-  -webkit-appearance: none; /* Removes native Safari styling overrides */
-  -moz-appearance: none;    /* Removes native Firefox styling overrides */
+  -webkit-appearance: none;
+  /* Removes native Safari styling overrides */
+  -moz-appearance: none;
+  /* Removes native Firefox styling overrides */
 }
 
 .input-group input:hover,
@@ -136,8 +144,10 @@
 
 /* DROPDOWN MENU OPTIONS FIX */
 .input-group select option {
-  background-color: #12111a; /* Dark sleek background to remove white blinding dropdown */
-  color: #ffffff;            /* Makes options highly visible and clean */
+  background-color: #12111a;
+  /* Dark sleek background to remove white blinding dropdown */
+  color: #ffffff;
+  /* Makes options highly visible and clean */
   padding: 10px;
 }
 
@@ -210,7 +220,8 @@
 /* Tighter Action Button */
 .signup-btn {
   width: 100%;
-  padding: 11px; /* Scaled down action height */
+  padding: 11px;
+  /* Scaled down action height */
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.15);
   background: rgba(255, 255, 255, 0.06);
@@ -235,7 +246,8 @@
   align-items: center;
   color: #9ca3af;
   font-size: 11px;
-  margin: 14px 0; /* Reduced from 20px+ */
+  margin: 14px 0;
+  /* Reduced from 20px+ */
 }
 
 .divider::before,
@@ -258,7 +270,8 @@
 }
 
 .social-btn {
-  width: 40px; /* Reduced from 46px */
+  width: 40px;
+  /* Reduced from 46px */
   height: 40px;
   border-radius: 10px;
   display: flex;
@@ -299,7 +312,7 @@
   justify-content: center;
   padding: 36px;
   background-image: radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.15), transparent),
-                    url("./signup.png");
+    url("./signup.png");
   background-size: cover;
   background-position: right center;
   border-left: 1px solid rgba(255, 255, 255, 0.06);
@@ -337,11 +350,14 @@
 @media (max-width: 768px) {
   .signup-container {
     grid-template-columns: 1fr;
-    max-width: 440px; /* Scaled mobile breakpoint width symmetrically */
+    max-width: 440px;
+    /* Scaled mobile breakpoint width symmetrically */
   }
+
   .signup-right {
     display: none;
   }
+
   .signup-left {
     padding: 28px 24px;
   }

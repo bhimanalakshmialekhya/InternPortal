@@ -4,10 +4,10 @@ import { useRouter } from "next/navigation"
 
 // Role → home route mapping
 export const ROLE_ROUTES = {
-  intern:      "/intern/dashboard",
-  mentor:      "/mentor/dashboard",
-  evaluator:   "/mentor/dashboard",
-  admin:       "/admin/dashboard",
+  intern: "/intern/dashboard",
+  mentor: "/mentor/dashboard",
+  evaluator: "/mentor/dashboard",
+  admin: "/admin/dashboard",
   institution: "/institution/dashboard",
 }
 
@@ -30,11 +30,11 @@ export function getUser(expectedRole) {
     const path = window.location.pathname
     const roleFromPath =
       path.startsWith("/intern/") ? "intern" :
-      path.startsWith("/mentor/") ? "mentor" :
-      path.startsWith("/institution/") ? "institution" :
-      path.startsWith("/admin/") ? "admin" :
-      path.startsWith("/evaluation/") ? "evaluator" :
-      null
+        path.startsWith("/mentor/") ? "mentor" :
+          path.startsWith("/institution/") ? "institution" :
+            path.startsWith("/admin/") ? "admin" :
+              path.startsWith("/evaluation/") ? "evaluator" :
+                null
 
     if (roleFromPath) {
       const specific = localStorage.getItem(`user_${roleFromPath}`)
@@ -69,7 +69,7 @@ function enrichUser(u) {
       try {
         const acct = JSON.parse(localStorage.getItem(`account_${res.email.toLowerCase().trim()}`) || "null")
         if (acct?.fullName) res.fullName = acct.fullName
-      } catch {}
+      } catch { }
     }
   }
   return res
@@ -242,11 +242,11 @@ export function logout(router) {
   if (typeof window !== "undefined") {
     const path = window.location.pathname
     const roleFromPath =
-      path.startsWith("/intern/")      ? "intern" :
-      path.startsWith("/mentor/")      ? "mentor" :
-      path.startsWith("/institution/") ? "institution" :
-      path.startsWith("/admin/")       ? "admin" :
-      path.startsWith("/evaluation/")  ? "evaluator" : null
+      path.startsWith("/intern/") ? "intern" :
+        path.startsWith("/mentor/") ? "mentor" :
+          path.startsWith("/institution/") ? "institution" :
+            path.startsWith("/admin/") ? "admin" :
+              path.startsWith("/evaluation/") ? "evaluator" : null
     if (roleFromPath) localStorage.removeItem(`user_${roleFromPath}`)
     localStorage.removeItem("token")
     localStorage.removeItem("user")

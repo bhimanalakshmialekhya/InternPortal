@@ -56,7 +56,22 @@ function Login() {
 
       if (res.ok && data?.url) {
         window.location.href = data.url;
-      } else if (data?.configured === false || res.status === 400 || res.status === 404) {
+        return;
+      }
+      
+      // If deployed backend is 404 or unreachable, try localhost:5000 if running locally
+      if (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && apiUrl !== "http://localhost:5000") {
+        try {
+          const localRes = await fetch(`http://localhost:5000/auth/oauth/authorize/${provider}?role=intern&format=json`);
+          const localData = await localRes.json().catch(() => ({}));
+          if (localRes.ok && localData?.url) {
+            window.location.href = localData.url;
+            return;
+          }
+        } catch {}
+      }
+
+      if (data?.configured === false || res.status === 400 || res.status === 404) {
         setOauthNotice(
           data?.error || `${provider.charAt(0).toUpperCase() + provider.slice(1)} OAuth is not configured on the backend. Please add client credentials to server/.env.`
         );
