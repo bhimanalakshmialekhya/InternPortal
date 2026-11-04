@@ -88,7 +88,7 @@ export default function RoleAssessmentModal({ isOpen, onClose, onRoleAssigned, c
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
       <div
-        className="relative w-full max-w-5xl overflow-hidden rounded-3xl border border-cyan-500/25 bg-[#070B1A] text-white shadow-2xl transition-all"
+        className="relative w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden rounded-3xl border border-cyan-500/25 bg-[#070B1A] text-white shadow-2xl transition-all"
         style={{
           boxShadow: "0 0 50px rgba(6, 182, 212, 0.15), 0 0 80px rgba(124, 58, 237, 0.15)"
         }}
@@ -98,49 +98,71 @@ export default function RoleAssessmentModal({ isOpen, onClose, onRoleAssigned, c
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-cyan-600/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* HEADER */}
-        <div className="relative z-10 flex items-center justify-between border-b border-white/10 px-6 sm:px-8 py-5 bg-[#0a1026]/90">
+        <div className="relative z-10 flex items-center justify-between border-b border-white/10 px-6 sm:px-8 py-4 bg-[#0a1026]/90 flex-shrink-0">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-r from-cyan-500 to-purple-600 flex items-center justify-center shadow-lg flex-shrink-0">
-              <Award size={24} className="text-white" />
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-r from-cyan-500 to-purple-600 flex items-center justify-center shadow-lg flex-shrink-0">
+              <Award size={22} className="text-white" />
             </div>
             <div>
-              <h2 className="text-lg sm:text-xl font-extrabold flex items-center gap-2.5">
+              <h2 className="text-base sm:text-lg font-extrabold flex items-center gap-2">
                 Intern Role Skill Assessment
                 <span className="text-xs px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-semibold">
                   16 MCQs
                 </span>
               </h2>
-              <p className="text-xs sm:text-sm text-gray-400 mt-0.5">
+              <p className="text-xs text-gray-400 mt-0.5">
                 Tests FSD, Data Structures, Backend & Databases to assign your specialization role.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition"
+            className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition cursor-pointer"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* PROGRESS BAR */}
+        {/* PROGRESS BAR & JUMP PILLS */}
         {!showResult && (
-          <div className="px-6 sm:px-8 pt-4 pb-2 bg-[#070B1A]">
+          <div className="px-6 sm:px-8 pt-3 pb-2 bg-[#070B1A] border-b border-white/5 flex-shrink-0">
             <div className="flex items-center justify-between text-xs text-gray-300 mb-2 font-medium">
               <span>Question {currentIdx + 1} of {totalQ}</span>
               <span className="text-cyan-400 font-bold">{answeredCount}/{totalQ} Answered ({progressPct}%)</span>
             </div>
-            <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden">
+            <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden mb-2.5">
               <div
                 className="h-full bg-gradient-to-r from-cyan-400 via-indigo-500 to-purple-500 transition-all duration-300 rounded-full"
                 style={{ width: `${((currentIdx + 1) / totalQ) * 100}%` }}
               />
             </div>
+            {/* Quick Navigation Numbers */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              {ASSESSMENT_QUESTIONS.map((q, idx) => {
+                const isAns = answers[q.id] !== undefined
+                const isCur = idx === currentIdx
+                return (
+                  <button
+                    key={q.id}
+                    onClick={() => setCurrentIdx(idx)}
+                    className={`min-w-[30px] h-[30px] px-1 rounded-lg text-xs font-bold transition flex items-center justify-center flex-shrink-0 cursor-pointer shadow-sm ${
+                      isCur
+                        ? "ring-2 ring-cyan-400 bg-gradient-to-r from-cyan-400 to-cyan-500 text-black font-black scale-105"
+                        : isAns
+                        ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold"
+                        : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    {idx + 1}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         )}
 
         {/* CONTENT */}
-        <div className="relative z-10 p-6 sm:p-8 max-h-[75vh] overflow-y-auto">
+        <div className="relative z-10 p-6 sm:p-8 flex-1 overflow-y-auto">
           {!showResult ? (
             <div>
               {/* Question domain badge */}
@@ -276,8 +298,8 @@ export default function RoleAssessmentModal({ isOpen, onClose, onRoleAssigned, c
           )}
         </div>
 
-        {/* FOOTER ACTIONS */}
-        <div className="relative z-10 flex items-center justify-between border-t border-white/10 px-6 py-4 bg-[#0a1026]/90">
+        {/* FOOTER ACTIONS (Always accessible) */}
+        <div className="relative z-10 flex items-center justify-between border-t border-white/10 px-6 py-4 bg-[#0a1026]/95 flex-shrink-0">
           {!showResult ? (
             <>
               <button

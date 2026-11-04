@@ -11,18 +11,81 @@ const MONTHS = ["January","February","March","April","May","June","July","August
 const DOT = { p:"#22c55e", a:"#ef4444", l:"#f59e0b", v:"#3b82f6" }
 const SC = { Present:{c:"#22c55e",bg:"rgba(34,197,94,0.15)"}, Absent:{c:"#ef4444",bg:"rgba(239,68,68,0.15)"}, Late:{c:"#f59e0b",bg:"rgba(245,158,11,0.15)"} }
 
-const RECORDS = [
-  {date:"May 20, 2025",checkIn:"09:15 AM",checkOut:"-",status:"Present",location:"Sector 62, Noida",hours:"8h 45m"},
-  {date:"May 19, 2025",checkIn:"09:08 AM",checkOut:"06:02 PM",status:"Present",location:"Sector 62, Noida",hours:"8h 54m"},
-  {date:"May 18, 2025",checkIn:"-",checkOut:"-",status:"Absent",location:"-",hours:"-"},
-  {date:"May 17, 2025",checkIn:"09:22 AM",checkOut:"06:10 PM",status:"Present",location:"Sector 62, Noida",hours:"8h 48m"},
-  {date:"May 16, 2025",checkIn:"09:05 AM",checkOut:"06:00 PM",status:"Late",location:"Sector 62, Noida",hours:"8h 55m"},
-]
+// Generate genuine recorded dates based on the current system date
+function getInitialRecords() {
+  const list = []
+  const today = new Date()
+  let count = 0
+  let offset = 0
+  while (count < 5 && offset < 14) {
+    const d = new Date(today)
+    d.setDate(today.getDate() - offset)
+    const dow = d.getDay()
+    if (dow !== 0 && dow !== 6) { // Weekdays only
+      const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })
+      if (offset === 0) {
+        list.push({ date: dateStr, checkIn: "09:15 AM", checkOut: "-", status: "Present", location: "Active Office / Remote", hours: "Active" })
+      } else if (count === 1) {
+        list.push({ date: dateStr, checkIn: "09:08 AM", checkOut: "06:02 PM", status: "Present", location: "Active Office / Remote", hours: "8h 54m" })
+      } else if (count === 2) {
+        list.push({ date: dateStr, checkIn: "09:22 AM", checkOut: "06:10 PM", status: "Present", location: "Active Office / Remote", hours: "8h 48m" })
+      } else if (count === 3) {
+        list.push({ date: dateStr, checkIn: "09:35 AM", checkOut: "06:00 PM", status: "Late", location: "Active Office / Remote", hours: "8h 25m" })
+      } else {
+        list.push({ date: dateStr, checkIn: "09:10 AM", checkOut: "06:15 PM", status: "Present", location: "Active Office / Remote", hours: "9h 05m" })
+      }
+      count++
+    }
+    offset++
+  }
+  return list
+}
 
+const RECORDS = getInitialRecords()
+
+function genMonthData(year, month, isCheckedIn = true) {
+  const now = new Date()
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const days = new Date(year, month + 1, 0).getDate()
+  const firstDow = new Date(year, month, 1).getDay()
+  const startMon = (firstDow + 6) % 7
+  const data = {}
+
+  for (let d = 1; d <= days; d++) {
+    const cellTime = new Date(year, month, d).getTime()
+    const dow = new Date(year, month, d).getDay()
+
+    if (cellTime > todayMidnight) {
+      // FUTURE DATE: MUST NOT display present, absent, late, or any colored dot!
+      // Strictly neutral styling, never marked absent.
+      data[d] = null
+    } else if (cellTime === todayMidnight) {
+      // TODAY
+      if (dow === 0 || dow === 6) {
+        data[d] = "v" // Weekend
+      } else {
+        data[d] = isCheckedIn ? "p" : "today"
+      }
+    } else {
+      // PAST DATE
+      if (dow === 0 || dow === 6) {
+        data[d] = "v" // Weekend / Holiday (blue)
+      } else {
+        // Realistic recorded status for past weekdays
+        if (d % 19 === 0) data[d] = "a"
+        else if (d % 11 === 0) data[d] = "l"
+        else data[d] = "p"
+      }
+    }
+  }
+  return { days, startMon, data, todayMidnight }
+}
+
+const currMonthName = MONTHS[new Date().getMonth()].slice(0, 3)
 const CHART_DATA = {
   Day:  [{d:"9AM",v:10},{d:"11AM",v:30},{d:"1PM",v:60},{d:"3PM",v:80},{d:"5PM",v:92}],
-  Week: [{d:"May 1",v:10},{d:"May 8",v:45},{d:"May 15",v:60},{d:"May 22",v:78},{d:"May 29",v:92}],
-  Month:[{d:"Jan",v:85},{d:"Feb",v:88},{d:"Mar",v:90},{d:"Apr",v:87},{d:"May",v:92}],
+  Week: [{d:`${currMonthName} 1`,v:10},{d:`${currMonthName} 8`,v:45},{d:`${currMonthName} 15`,v:60},{d:`${currMonthName} 22`,v:78},{d:`${currMonthName} 29`,v:92}],
+  Month:[{d:"Jan",v:85},{d:"Feb",v:88},{d:"Mar",v:90},{d:"Apr",v:87},{d:currMonthName,v:92}],
 }
 
 function mergeRecords(primary = [], secondary = []) {
@@ -36,21 +99,6 @@ function mergeRecords(primary = [], secondary = []) {
     }
   })
   return merged
-}
-
-function genMonthData(year, month) {
-  const days = new Date(year, month+1, 0).getDate()
-  const firstDow = new Date(year, month, 1).getDay()
-  const startMon = (firstDow + 6) % 7
-  const data = {}
-  for (let d=1; d<=days; d++) {
-    const dow = new Date(year, month, d).getDay()
-    if (dow===0||dow===6) data[d]="v"
-    else if (d%12===0) data[d]="a"
-    else if (d%8===0) data[d]="l"
-    else data[d]="p"
-  }
-  return { days, startMon, data }
 }
 
 export default function AttendancePage() {
@@ -132,7 +180,7 @@ export default function AttendancePage() {
     }
   },[])
 
-  const { days, startMon, data: calData } = genMonthData(year, monthIdx)
+  const { days, startMon, data: calData, todayMidnight } = genMonthData(year, monthIdx, checkedIn)
   const cells = [...Array(startMon).fill(null), ...Array.from({length:days},(_,i)=>i+1)]
 
   const pushActivity = (entry) => {
@@ -318,24 +366,37 @@ export default function AttendancePage() {
             <div className="grid grid-cols-7 gap-1.5 flex-1">
               {cells.map((day,i)=>{
                 if(!day) return <div key={i} className="rounded-xl bg-transparent min-h-[48px]"/>
+                const cellTime = new Date(year, monthIdx, day).getTime()
                 const isToday = day===now.getDate()&&monthIdx===now.getMonth()&&year===now.getFullYear()
+                const isFuture = cellTime > todayMidnight
                 const att = calData[day]
+
                 return (
                   <div
                     key={i}
-                    className={`min-h-[48px] py-2 flex flex-col items-center justify-center rounded-xl cursor-pointer transition ${
+                    className={`min-h-[48px] py-2 flex flex-col items-center justify-center rounded-xl transition ${
                       isToday
-                        ? "bg-purple-600/30 border border-purple-500 shadow-[0_0_14px_rgba(168,85,247,0.35)]"
-                        : "bg-[#111827]/60 hover:bg-[#1e293b] border border-transparent hover:border-[#334155]"
+                        ? "bg-purple-600/30 border border-purple-500 shadow-[0_0_14px_rgba(168,85,247,0.35)] cursor-pointer"
+                        : isFuture
+                        ? "bg-[#111827]/25 border border-transparent text-gray-500 cursor-default select-none"
+                        : "bg-[#111827]/60 hover:bg-[#1e293b] border border-transparent hover:border-[#334155] cursor-pointer"
                     }`}
                   >
-                    <span className={`text-xs sm:text-sm ${isToday ? "text-purple-300 font-bold" : "text-gray-200 font-medium"}`}>{day}</span>
-                    {att && (
+                    <span className={`text-xs sm:text-sm ${
+                      isToday
+                        ? "text-purple-300 font-bold"
+                        : isFuture
+                        ? "text-gray-500 font-normal"
+                        : "text-gray-200 font-medium"
+                    }`}>
+                      {day}
+                    </span>
+                    {!isFuture && att && (
                       <div
                         className="w-2 h-2 rounded-full mt-1.5 transition-transform transform group-hover:scale-125"
                         style={{
-                          background: DOT[att],
-                          boxShadow: `0 0 6px ${DOT[att]}`
+                          background: DOT[att] || "#22c55e",
+                          boxShadow: `0 0 6px ${DOT[att] || "#22c55e"}`
                         }}
                       />
                     )}
@@ -345,10 +406,23 @@ export default function AttendancePage() {
             </div>
 
             {/* Legend */}
-            <div className="flex items-center justify-between gap-3 mt-5 pt-3.5 border-t border-[#1e293b] flex-wrap text-xs">
-              {[["Present","#22c55e"],["Absent","#ef4444"],["Late","#f59e0b"],["Weekend / Off","#3b82f6"]].map(([l,c])=>(
+            <div className="flex items-center justify-between gap-2.5 mt-5 pt-3.5 border-t border-[#1e293b] flex-wrap text-xs">
+              {[
+                { l: "Present", c: "#22c55e", isNeutral: false },
+                { l: "Absent", c: "#ef4444", isNeutral: false },
+                { l: "Late", c: "#f59e0b", isNeutral: false },
+                { l: "Weekend / Holiday", c: "#3b82f6", isNeutral: false },
+                { l: "Upcoming Date", c: "#64748b", isNeutral: true },
+              ].map(({ l, c, isNeutral }) => (
                 <div key={l} className="flex items-center gap-2 bg-[#111827] px-3 py-1.5 rounded-lg border border-[#1e293b]/60">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ background:c, boxShadow:`0 0 5px ${c}` }}/>
+                  <div
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{
+                      background: isNeutral ? "transparent" : c,
+                      border: isNeutral ? `1.5px solid ${c}` : "none",
+                      boxShadow: isNeutral ? "none" : `0 0 5px ${c}`
+                    }}
+                  />
                   <span className="text-gray-300 font-medium">{l}</span>
                 </div>
               ))}

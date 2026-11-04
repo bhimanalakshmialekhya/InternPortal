@@ -201,6 +201,16 @@ export default function MessagesPage() {
   const fileRef = useRef(null)
   const chatEndRef = useRef(null)
   const seenMsgKeys = useRef(new Set())
+  const respondedMsgIdsRef = useRef(new Set())
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem("intern_responded_msg_ids") || "[]")
+      if (Array.isArray(stored)) {
+        stored.forEach(id => respondedMsgIdsRef.current.add(id))
+      }
+    } catch {}
+  }, [])
 
   // Persist chats state to localStorage
   useEffect(() => {
@@ -384,6 +394,52 @@ export default function MessagesPage() {
       id: userMsg.id,
       replyTo: userMsg.replyTo,
     })
+
+    // Strict 1-time mentor response guarded by unique message ID
+    // NEVER generates on refresh or conversation switch
+    const triggerId = userMsg.id
+    if (!respondedMsgIdsRef.current.has(triggerId)) {
+      respondedMsgIdsRef.current.add(triggerId)
+      try {
+        const stored = JSON.parse(localStorage.getItem("intern_responded_msg_ids") || "[]")
+        localStorage.setItem("intern_responded_msg_ids", JSON.stringify([...stored, triggerId].slice(-200)))
+      } catch {}
+
+      const targetContactId = sel.id
+      const targetMentorName = sel.name
+      setTimeout(() => {
+        const replies = [
+          `Received your update, ${loginName}! Reviewing your latest code changes.`,
+          `Great progress! Continue following the assigned milestone sprint guidelines.`,
+          `Noted! Let me know if you encounter any blockers with the implementation.`,
+          `Looks solid. I'll inspect the pull request during our scheduled review.`
+        ]
+        const replyText = replies[Math.floor(Math.random() * replies.length)]
+        const replyTime = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+        const mentorReplyMsg = {
+          id: `rep-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          from: "them",
+          text: replyText,
+          time: replyTime,
+          senderName: targetMentorName,
+          read: true,
+          status: "seen"
+        }
+
+        setChats(prev => {
+          const currentThread = prev[targetContactId] || []
+          const updatedThread = currentThread.map(m => m.id === triggerId ? { ...m, status: "seen" } : m)
+          return {
+            ...prev,
+            [targetContactId]: [...updatedThread, mentorReplyMsg]
+          }
+        })
+
+        setContactList(prev =>
+          prev.map(c => c.id === targetContactId ? { ...c, lastMsg: replyText, time: replyTime } : c)
+        )
+      }, 1600)
+    }
   }
 
   // File sharing handler

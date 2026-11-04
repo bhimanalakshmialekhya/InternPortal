@@ -1,18 +1,9 @@
 "use client"
-import React, { useState, useEffect, useMemo } from "react"
+import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import InternSidebar from "../../../lib/internSidebar"
 import { getInternUser, resolveInternName, getInternPhoto, DEFAULT_INTERN_AVATAR } from "../../../lib/api"
 import { getAssignedRole } from "../../../lib/assessmentData"
-import {
-  getEvaluationsForIntern,
-  getSubmissionsForIntern,
-  gradeLabel,
-  DEFAULT_RUBRICS,
-  KEY_INTERN_EVALUATIONS,
-  KEY_INTERN_SUBMISSIONS,
-  downloadSubmissionFile,
-} from "../../../lib/evaluationSync"
 import {
   getSaved15DayTests,
   getSavedWeeklyFeedback,
@@ -22,827 +13,406 @@ import {
 } from "../../../lib/milestoneTestAndFeedback"
 import MilestoneTestModal from "../../../components/MilestoneTestModal"
 import {
-  Star, Clock, CheckCircle2, FileText, User, Award, Calendar,
-  Sparkles, TrendingUp, CheckCircle, ChevronRight, BookOpen,
-  AlertCircle, RotateCcw, Download, ShieldCheck, MessageSquare,
-  ThumbsUp, ExternalLink, X, HelpCircle, Layers, ArrowRight
+  Star, Award, Calendar, CheckCircle2, ChevronDown, ChevronUp,
+  MessageSquare, User, Clock, ArrowRight, ShieldCheck, Sparkles,
+  TrendingUp, FileText, CheckCircle
 } from "lucide-react"
-import { ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 
 export default function InternEvaluationPage() {
   const router = useRouter()
   const [user, setUser] = useState({})
   const [assignedRole, setAssignedRole] = useState("Backend Developer")
-  const [activeTab, setActiveTab] = useState("overview") // "overview" | "15day" | "weekly" | "tasks"
-
-  // 15-Day Milestone Tests State
   const [tests15Day, setTests15Day] = useState([])
-  const [activeSprint, setActiveSprint] = useState(1)
-  const [isTestModalOpen, setIsTestModalOpen] = useState(false)
-  const [certModalData, setCertModalData] = useState(null)
-
-  // Weekly Mentor Feedback State
   const [weeklyFeedback, setWeeklyFeedback] = useState([])
+  const [isTestModalOpen, setIsTestModalOpen] = useState(false)
+  const [expandedFeedbackId, setExpandedFeedbackId] = useState(null)
 
-  // Submissions & Legacy Evaluations
-  const [evaluations, setEvaluations] = useState([])
-  const [submissions, setSubmissions] = useState([])
-  const [sel, setSel] = useState(null)
-
-  const loadAll = () => {
+  const loadData = () => {
     try {
       const u = getInternUser()
       setUser(u)
       const role = getAssignedRole(u) || localStorage.getItem("intern_assigned_role") || "Backend Developer"
       setAssignedRole(role)
 
-      // 15-Day Tests
       const tests = getSaved15DayTests(u, role)
       setTests15Day(tests)
 
-      // Weekly Feedback
       const feedback = getSavedWeeklyFeedback(u, role)
       setWeeklyFeedback(feedback)
-
-      // Submissions & evaluations
-      const ev = getEvaluationsForIntern(u)
-      const subs = getSubmissionsForIntern(u)
-      setEvaluations(ev)
-      setSubmissions(subs)
-      setSel((prev) => {
-        if (prev) {
-          const merged = [
-            ...ev.map((e) => ({ ...e, _kind: "evaluation" })),
-            ...subs.map((s) => ({ ...s, _kind: "submission" })),
-          ]
-          return merged.find((x) => x.id === prev.id && x._kind === prev._kind) || merged[0] || null
-        }
-        return ev[0] ? { ...ev[0], _kind: "evaluation" } : subs[0] ? { ...subs[0], _kind: "submission" } : null
-      })
     } catch (e) {
-      console.error("Evaluation page load error:", e)
+      console.error("Evaluation load error:", e)
     }
   }
 
   useEffect(() => {
-    try {
-      const u = getInternUser()
-      const role = (u.role || "intern").toLowerCase()
-      if (role !== "intern" && role !== "demo" && !u.isDemo) {
-        router.replace("/login")
-        return
-      }
-    } catch {}
-
-    loadAll()
-
+    loadData()
     const onStorage = (e) => {
-      if (
-        e.key === KEY_15_DAY_TESTS ||
-        e.key === KEY_WEEKLY_FEEDBACK ||
-        e.key === KEY_INTERN_EVALUATIONS ||
-        e.key === KEY_INTERN_SUBMISSIONS
-      ) {
-        loadAll()
+      if (e.key === KEY_15_DAY_TESTS || e.key === KEY_WEEKLY_FEEDBACK) {
+        loadData()
       }
     }
-
-    const intervalId = setInterval(loadAll, 3000)
     window.addEventListener("storage", onStorage)
-    window.addEventListener(KEY_15_DAY_TESTS, loadAll)
-    window.addEventListener(KEY_WEEKLY_FEEDBACK, loadAll)
-    window.addEventListener(KEY_INTERN_EVALUATIONS, loadAll)
-    window.addEventListener(KEY_INTERN_SUBMISSIONS, loadAll)
-
+    window.addEventListener(KEY_15_DAY_TESTS, loadData)
+    window.addEventListener(KEY_WEEKLY_FEEDBACK, loadData)
     return () => {
-      clearInterval(intervalId)
       window.removeEventListener("storage", onStorage)
-      window.removeEventListener(KEY_15_DAY_TESTS, loadAll)
-      window.removeEventListener(KEY_WEEKLY_FEEDBACK, loadAll)
-      window.removeEventListener(KEY_INTERN_EVALUATIONS, loadAll)
-      window.removeEventListener(KEY_INTERN_SUBMISSIONS, loadAll)
+      window.removeEventListener(KEY_15_DAY_TESTS, loadData)
+      window.removeEventListener(KEY_WEEKLY_FEEDBACK, loadData)
     }
-  }, [router])
+  }, [])
 
-  const internName = resolveInternName(user) || "Intern"
   const mentor = getMentorForRole(assignedRole)
-  const sprint1Test = tests15Day.find((t) => t.sprintNumber === 1) || tests15Day[0]
-  const sprint2Test = tests15Day.find((t) => t.sprintNumber === 2)
+  const sprint1Test = tests15Day.find((t) => t.sprintNumber === 1) || tests15Day[0] || null
 
-  // Detail item for task submissions
-  const detail = sel
-  const isPerf = detail?._kind === "evaluation"
-  const total = isPerf ? detail?.totalScore || 0 : 0
-  const pieData = [
-    { name: "Score", v: total, c: "#7C3AED" },
-    { name: "Remaining", v: Math.max(0, 100 - total), c: "rgba(255,255,255,0.08)" },
-  ]
-  const rubrics = detail?.rubrics || DEFAULT_RUBRICS
-  const scores = detail?.scores || {}
-
-  const handleTestCompleted = (newResult) => {
-    loadAll()
+  // Calculate dynamic next evaluation date (e.g. next Friday at 3:00 PM)
+  const getNextEvaluationDate = () => {
+    const d = new Date()
+    const day = d.getDay()
+    const diff = (5 - day + 7) % 7 || 7 // Next Friday
+    d.setDate(d.getDate() + diff)
+    return {
+      formatted: d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }),
+      daysRemaining: diff,
+      time: "03:00 PM"
+    }
   }
+  const nextEval = getNextEvaluationDate()
 
-  const handleOpenCertificate = (testItem) => {
-    setCertModalData({
-      internName,
-      milestoneTitle: testItem.milestone,
-      score: testItem.score,
-      grade: testItem.grade,
-      dateTaken: testItem.dateTaken,
-      role: assignedRole,
-      mentorName: testItem.evaluatedBy || mentor.name,
-      mentorCompany: testItem.mentorCompany || mentor.company,
-      certificateId: testItem.certificateId,
-    })
+  const toggleFeedbackExpand = (id) => {
+    setExpandedFeedbackId(prev => (prev === id ? null : id))
   }
 
   return (
-    <div className="portal-root relative h-screen w-full max-w-full overflow-hidden text-white flex">
-      {/* Background Video (Matching Tasks Image 1) */}
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute top-0 left-0 w-full h-full object-cover z-0"
-      >
-        <source src="data:video/mp4;base64," type="video/mp4" />
-      </video>
+    <div className="portal-root h-screen w-full max-w-full overflow-hidden text-white flex relative bg-[#020617]">
+      {/* Background glow effects */}
+      <div className="absolute top-10 right-10 w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-3xl pointer-events-none z-0" />
+      <div className="absolute bottom-10 left-10 w-[500px] h-[500px] bg-cyan-600/10 rounded-full blur-3xl pointer-events-none z-0" />
 
-      {/* Dark Overlay (Matching Tasks Image 1) */}
-      <div className="absolute inset-0 bg-black/70 z-0"></div>
-
-      {/* Main Content Layout */}
-      <div className="relative z-10 flex w-full h-full">
-        {/* SIDEBAR (Matches Tasks Image 1 size) */}
+      {/* CONTENT */}
+      <div className="relative z-10 flex w-full h-full min-w-0">
         <InternSidebar active="Evaluation" />
 
-        {/* MAIN EVALUATIONS AREA (Full-width, matching Tasks) */}
-        <main className="flex-1 flex flex-col overflow-y-auto p-4 gap-4">
+        <main className="flex-1 flex flex-col h-screen overflow-y-auto p-5 sm:p-7 lg:p-9 gap-6 min-w-0 custom-scrollbar">
           {/* HEADER */}
-          <div className="flex items-center justify-between flex-shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1e293b] pb-5 flex-shrink-0">
             <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2 text-white">
-                <Star size={22} className="text-purple-400" /> My Evaluations
-              </h1>
-              <p className="text-gray-400 text-xs mt-0.5">
-                15-Day Milestone Assessments, Weekly Mentor Feedback & Performance Reviews.
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Performance Evaluation</h1>
+                <span className="text-xs px-3 py-1 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-semibold flex items-center gap-1.5 shadow-sm">
+                  <ShieldCheck size={14} /> Verified Evaluation Record
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-gray-400 mt-1">
+                Official milestone performance rating, mentor evaluations, and upcoming review schedule.
               </p>
             </div>
 
-            {/* TAB SELECTORS */}
-            <div className="flex bg-[#0f172a] border border-[#1e293b] rounded-xl p-1 gap-1">
-              {[
-                { id: "overview", label: "All Overview" },
-                { id: "15day", label: "15-Day Tests (Milestones)" },
-                { id: "weekly", label: "Weekly Mentor Feedback" },
-                { id: "tasks", label: "Task Submissions" },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                    activeTab === tab.id
-                      ? "bg-gradient-to-r from-cyan-500 to-purple-600 text-white shadow-md"
-                      : "text-gray-400 hover:text-white hover:bg-[#1e293b]"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+            <div className="flex items-center gap-2.5 self-start sm:self-auto bg-[#0f172a] border border-[#1e293b] px-3.5 py-2 rounded-2xl shadow-sm">
+              <span className="text-xs text-gray-400 font-medium">Specialization:</span>
+              <span className="text-xs font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400">
+                {assignedRole}
+              </span>
             </div>
           </div>
 
-          {/* TOP KPI CARDS (Summary of 15-day test, mentor rating, weekly reviews, and track) */}
-          <div className="grid grid-cols-4 gap-4">
-            {/* KPI 1: 15-Day Test Status */}
-            <div
-              onClick={() => setActiveTab("15day")}
-              className="bg-[#0f172a] border border-[#1e293b] hover:border-cyan-500/50 rounded-3xl p-4 flex flex-col justify-between cursor-pointer transition shadow-lg card-hover"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase font-semibold text-gray-400 tracking-wider">
-                  15-Day Milestone Test
-                </span>
-                <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              </div>
-              <div className="my-2">
-                <h3 className="text-2xl font-bold text-white flex items-center gap-2">
-                  {sprint1Test?.score ? `${sprint1Test.score}%` : "Ready"}
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
-                    Grade {sprint1Test?.grade || "A+"}
-                  </span>
-                </h3>
-                <p className="text-[11px] text-cyan-300 font-medium mt-0.5">
-                  Day 15 Sprint 1: {sprint1Test?.status || "Passed"}
-                </p>
-              </div>
-              <div className="flex items-center justify-between text-[10px] text-gray-500 border-t border-[#1e293b] pt-2">
-                <span>Next test in 12 days</span>
-                <span className="text-cyan-400 font-semibold flex items-center gap-0.5">
-                  View Results →
-                </span>
-              </div>
-            </div>
+          {/* 6 ESSENTIAL EVALUATION SECTIONS */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-            {/* KPI 2: Mentor Weekly Rating */}
-            <div
-              onClick={() => setActiveTab("weekly")}
-              className="bg-[#0f172a] border border-[#1e293b] hover:border-purple-500/50 rounded-3xl p-4 flex flex-col justify-between cursor-pointer transition shadow-lg card-hover"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase font-semibold text-gray-400 tracking-wider">
-                  Mentor Performance Rating
-                </span>
-                <Star size={14} className="text-yellow-400 fill-yellow-400" />
-              </div>
-              <div className="my-2">
-                <h3 className="text-2xl font-bold text-white flex items-center gap-1.5">
-                  {weeklyFeedback[0]?.rating || 4.9}
-                  <span className="text-xs text-gray-400 font-normal">/ 5.0</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                    Top 5%
-                  </span>
-                </h3>
-                <p className="text-[11px] text-purple-300 font-medium mt-0.5">
-                  Status: {weeklyFeedback[0]?.status || "Exceeds Expectations"}
-                </p>
-              </div>
-              <div className="flex items-center justify-between text-[10px] text-gray-500 border-t border-[#1e293b] pt-2">
-                <span>3 Weekly Reviews</span>
-                <span className="text-purple-400 font-semibold flex items-center gap-0.5">
-                  Read Feedback →
-                </span>
-              </div>
-            </div>
-
-            {/* KPI 3: Assigned Mentor Profile */}
-            <div
-              onClick={() => router.push("/intern/mentor")}
-              className="bg-[#0f172a] border border-[#1e293b] hover:border-blue-500/50 rounded-3xl p-4 flex flex-col justify-between cursor-pointer transition shadow-lg card-hover"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase font-semibold text-gray-400 tracking-wider">
-                  Assigned Mentor
-                </span>
-                <ShieldCheck size={14} className="text-blue-400" />
-              </div>
-              <div className="flex items-center gap-2.5 my-2">
-                <div
-                  className="w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-sm text-white shadow-md flex-shrink-0"
-                  style={{ background: mentor.color }}
-                >
-                  {mentor.avatar}
-                </div>
-                <div className="min-w-0">
-                  <h4 className="text-sm font-bold text-white truncate">{mentor.name}</h4>
-                  <p className="text-[10px] text-gray-400 truncate">{mentor.role}</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between text-[10px] text-gray-500 border-t border-[#1e293b] pt-2">
-                <span className="truncate">{mentor.company}</span>
-                <span className="text-blue-400 font-semibold">Message →</span>
-              </div>
-            </div>
-
-            {/* KPI 4: Technical Track Specialization */}
-            <div
-              onClick={() => router.push("/intern/tasks")}
-              className="bg-[#0f172a] border border-[#1e293b] hover:border-pink-500/50 rounded-3xl p-4 flex flex-col justify-between cursor-pointer transition shadow-lg card-hover"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase font-semibold text-gray-400 tracking-wider">
-                  Intern Track
-                </span>
-                <Sparkles size={14} className="text-pink-400" />
-              </div>
-              <div className="my-2">
-                <h3 className="text-lg font-bold text-white truncate">
-                  {assignedRole}
-                </h3>
-                <p className="text-[11px] text-pink-300 font-medium mt-0.5">
-                  15-Day Milestone Cycle Active
-                </p>
-              </div>
-              <div className="flex items-center justify-between text-[10px] text-gray-500 border-t border-[#1e293b] pt-2">
-                <span>Evaluated Weekly</span>
-                <span className="text-pink-400 font-semibold">Track Tasks →</span>
-              </div>
-            </div>
-          </div>
-
-          {/* ═══════════════════════════════════════════════════════════════════ */}
-          {/* SECTION 1: 15-DAY MILESTONE TEST RESULTS & ASSESSMENTS */}
-          {/* ═══════════════════════════════════════════════════════════════════ */}
-          {(activeTab === "overview" || activeTab === "15day") && (
-            <div className="bg-[#0f172a] border border-[#1e293b] rounded-3xl p-5 shadow-xl space-y-4">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-500/30">
-                      15 Days Once Test Requirement
-                    </span>
-                    <span className="text-xs text-gray-400">• Technical Track: <strong className="text-white">{assignedRole}</strong></span>
+            {/* 1. OVERALL PERFORMANCE RATING (Span 7) */}
+            <div className="lg:col-span-7 bg-[#0f172a]/95 border border-cyan-500/25 rounded-3xl p-6 sm:p-7 shadow-xl flex flex-col justify-between relative overflow-hidden">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-r from-cyan-500 to-purple-600 flex items-center justify-center text-white shadow-lg flex-shrink-0">
+                    <Award size={24} />
                   </div>
-                  <h2 className="text-lg font-bold text-white mt-1 flex items-center gap-2">
-                    <Award size={20} className="text-yellow-400" /> 15-Day Milestone Assessments & Results
-                  </h2>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      setActiveSprint(1)
-                      setIsTestModalOpen(true)
-                    }}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 text-xs font-bold text-white shadow-lg shadow-purple-900/30 hover:brightness-110 transition cursor-pointer"
-                  >
-                    <RotateCcw size={13} />
-                    <span>{sprint1Test?.score ? "Retake Day 15 Test" : "Take Day 15 Test"}</span>
-                  </button>
-                  {sprint1Test?.score && (
-                    <button
-                      onClick={() => handleOpenCertificate(sprint1Test)}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#111827] border border-[#1e293b] text-xs font-semibold text-gray-300 hover:text-white transition cursor-pointer"
-                    >
-                      <Download size={13} className="text-cyan-400" />
-                      <span>Certificate</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* 4-SPRINT ROADMAP TIMELINE */}
-              <div className="grid grid-cols-4 gap-3 bg-[#070b19] border border-[#1e293b] rounded-2xl p-3">
-                {tests15Day.map((t, idx) => {
-                  const isPassed = t.status === "Passed"
-                  const isUpcoming = t.status === "Upcoming"
-                  return (
-                    <div
-                      key={t.id}
-                      className={`p-3 rounded-xl border transition ${
-                        isPassed
-                          ? "bg-cyan-950/20 border-cyan-500/40"
-                          : isUpcoming
-                          ? "bg-purple-950/20 border-purple-500/40"
-                          : "bg-[#0b1022] border-[#1e293b]/60 opacity-60"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[10px] font-bold text-gray-400">
-                          Sprint {t.sprintNumber} (Day {t.dayNumber})
-                        </span>
-                        {isPassed ? (
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-green-500/20 text-green-400 border border-green-500/30">
-                            {t.score}% • Passed
-                          </span>
-                        ) : isUpcoming ? (
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                            In {t.daysRemaining || 12} Days
-                          </span>
-                        ) : (
-                          <span className="text-[9px] text-gray-500 font-mono">Scheduled</span>
-                        )}
-                      </div>
-                      <h4 className="text-xs font-bold text-white truncate">{t.milestone}</h4>
-                      <p className="text-[10px] text-gray-400 mt-1 line-clamp-1">
-                        {isPassed
-                          ? `Grade ${t.grade} • ${t.dateTaken}`
-                          : t.dateScheduled || "Covers full sprint curriculum"}
-                      </p>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* SPRINT 1 (DAY 15) DETAILED RESULTS CARD */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 bg-[#0b1120] border border-[#1e293b] rounded-2xl p-4">
-                {/* Score badge & Status */}
-                <div className="lg:col-span-4 flex flex-col items-center justify-center p-4 rounded-xl bg-gradient-to-b from-[#0f172a] to-[#080d1a] border border-[#1e293b] text-center">
-                  <div className="relative w-32 h-32 flex items-center justify-center mb-2">
-                    <svg className="w-full h-full -rotate-90">
-                      <circle cx="64" cy="64" r="50" stroke="#1e293b" strokeWidth="9" fill="none" />
-                      <circle
-                        cx="64"
-                        cy="64"
-                        r="50"
-                        stroke="url(#cyanPurp)"
-                        strokeWidth="9"
-                        fill="none"
-                        strokeDasharray="314"
-                        strokeDashoffset={314 - (314 * (sprint1Test?.score || 92)) / 100}
-                        strokeLinecap="round"
-                      />
-                      <defs>
-                        <linearGradient id="cyanPurp">
-                          <stop offset="0%" stopColor="#22d3ee" />
-                          <stop offset="100%" stopColor="#a855f7" />
-                        </linearGradient>
-                      </defs>
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-3xl font-extrabold text-white leading-none">
-                        {sprint1Test?.score || 92}%
-                      </span>
-                      <span className="text-[10px] font-semibold text-cyan-400 mt-0.5">
-                        Grade {sprint1Test?.grade || "A+"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-green-500/20 text-green-400 border border-green-500/30 mb-1">
-                    <CheckCircle2 size={13} /> {sprint1Test?.status || "Passed & Verified"}
-                  </div>
-                  <p className="text-[11px] text-gray-400">
-                    {sprint1Test?.dateTaken || "Day 15 Milestone • Oct 28, 2026"}
-                  </p>
-                  <p className="text-[10px] text-gray-500 font-mono mt-0.5">
-                    Evaluated by: {sprint1Test?.evaluatedBy || mentor.name} ({mentor.company})
-                  </p>
-                </div>
-
-                {/* Topic Breakdown & Strengths */}
-                <div className="lg:col-span-8 flex flex-col justify-between space-y-3">
                   <div>
-                    <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                      <Sparkles size={15} className="text-cyan-400" />
-                      15-Day Test Topic Breakdown ({assignedRole})
-                    </h3>
-                    <div className="grid grid-cols-2 gap-3">
-                      {(sprint1Test?.breakdown?.length ? sprint1Test.breakdown : [
-                        { topic: "Core Architecture & APIs", score: 95, color: "#7C3AED" },
-                        { topic: "Implementation & Debugging", score: 92, color: "#06B6D4" },
-                        { topic: "Data Systems & Indexing", score: 90, color: "#10b981" },
-                        { topic: "Security & Best Practices", score: 91, color: "#f59e0b" },
-                      ]).map((b, i) => (
-                        <div key={i} className="p-2.5 rounded-xl bg-[#0f172a] border border-[#1e293b]">
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="text-gray-300 font-medium">{b.topic}</span>
-                            <span className="font-bold font-mono" style={{ color: b.color }}>
-                              {b.score}%
-                            </span>
-                          </div>
-                          <div className="w-full h-1.5 rounded-full bg-[#1e293b] overflow-hidden">
-                            <div
-                              className="h-full rounded-full"
-                              style={{ width: `${b.score}%`, backgroundColor: b.color }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <h2 className="text-base sm:text-lg font-bold text-white">1. Overall Performance Rating</h2>
+                    <p className="text-xs text-gray-400">Comprehensive internship performance benchmark</p>
                   </div>
+                </div>
+                <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  Grade A+ (Distinction)
+                </span>
+              </div>
 
-                  {/* Strengths & Improvement list */}
-                  <div className="grid grid-cols-2 gap-3 pt-1">
-                    <div className="p-3 rounded-xl bg-green-950/20 border border-green-500/25">
-                      <p className="text-[11px] font-bold text-green-400 flex items-center gap-1 mb-1.5">
-                        <CheckCircle2 size={12} /> Evaluated Strengths
-                      </p>
-                      <ul className="text-[10px] text-gray-300 space-y-1">
-                        <li>• Accurate REST status codes & stateless auth architecture.</li>
-                        <li>• Strong MongoDB query indexing and schema optimization.</li>
-                      </ul>
-                    </div>
-                    <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/25">
-                      <p className="text-[11px] font-bold text-amber-400 flex items-center gap-1 mb-1.5">
-                        <AlertCircle size={12} /> Growth Recommendations
-                      </p>
-                      <ul className="text-[10px] text-gray-300 space-y-1">
-                        <li>• Deepen unit test coverage for edge case token tampering.</li>
-                        <li>• Optimize multi-stage container build caches for Day 30 sprint.</li>
-                      </ul>
-                    </div>
-                  </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 my-3">
+                <div className="p-4 rounded-2xl bg-[#070B1A] border border-[#1e293b] text-center">
+                  <div className="text-3xl sm:text-4xl font-black text-cyan-400">4.8 <span className="text-lg text-gray-400 font-normal">/ 5.0</span></div>
+                  <div className="text-xs text-gray-400 font-semibold uppercase mt-1 tracking-wider">Overall Score</div>
+                </div>
+                <div className="p-4 rounded-2xl bg-[#070B1A] border border-[#1e293b] text-center">
+                  <div className="text-3xl sm:text-4xl font-black text-purple-400">92%</div>
+                  <div className="text-xs text-gray-400 font-semibold uppercase mt-1 tracking-wider">Completion Rate</div>
+                </div>
+                <div className="p-4 rounded-2xl bg-[#070B1A] border border-[#1e293b] text-center">
+                  <div className="text-3xl sm:text-4xl font-black text-emerald-400">18 / 24</div>
+                  <div className="text-xs text-gray-400 font-semibold uppercase mt-1 tracking-wider">Tasks Delivered</div>
+                </div>
+              </div>
+
+              {/* Visual Progress Bar */}
+              <div className="mt-2 pt-3 border-t border-[#1e293b]">
+                <div className="flex items-center justify-between text-xs text-gray-300 mb-1.5 font-medium">
+                  <span>Internship Curriculum Milestone Progress</span>
+                  <span className="text-cyan-400 font-bold">92% on track</span>
+                </div>
+                <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-cyan-400 via-indigo-500 to-purple-500 rounded-full w-[92%]" />
                 </div>
               </div>
             </div>
-          )}
 
-          {/* ═══════════════════════════════════════════════════════════════════ */}
-          {/* SECTION 2: WEEKLY FEEDBACK GIVEN BY MENTOR */}
-          {/* ═══════════════════════════════════════════════════════════════════ */}
-          {(activeTab === "overview" || activeTab === "weekly") && (
-            <div className="bg-[#0f172a] border border-[#1e293b] rounded-3xl p-5 shadow-xl space-y-4">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-500/30">
-                      Weekly Mentor Feedback Requirement
-                    </span>
-                    <span className="text-xs text-gray-400">• Mentor: <strong className="text-white">{mentor.name}</strong></span>
+            {/* 3. MENTOR PERFORMANCE RATING (Span 5) */}
+            <div className="lg:col-span-5 bg-[#0f172a]/95 border border-purple-500/25 rounded-3xl p-6 sm:p-7 shadow-xl flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-purple-600/20 text-purple-400 flex items-center justify-center flex-shrink-0">
+                    <Star size={22} className="fill-purple-400" />
                   </div>
-                  <h2 className="text-lg font-bold text-white mt-1 flex items-center gap-2">
-                    <MessageSquare size={20} className="text-purple-400" /> Weekly Feedback on Intern Work by Mentor
-                  </h2>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-bold text-white">3. Mentor Performance Rating</h2>
+                    <p className="text-xs text-gray-400">Evaluated on technical & soft skills</p>
+                  </div>
                 </div>
-
-                <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <span className="w-2 h-2 rounded-full bg-green-400 inline-block animate-pulse" />
-                  <span>3 Weeks Evaluated & Verified</span>
-                </div>
+                <span className="text-xs font-bold text-yellow-400 flex items-center gap-1">
+                  ⭐ Top 10%
+                </span>
               </div>
 
-              {/* LIST OF WEEKLY FEEDBACK CARDS */}
-              <div className="space-y-4">
-                {weeklyFeedback.map((wf) => (
-                  <div
-                    key={wf.id}
-                    className="p-5 rounded-2xl bg-[#0b1120] border border-[#1e293b] hover:border-purple-500/40 transition shadow-md"
-                  >
-                    {/* Header Row */}
-                    <div className="flex items-start justify-between flex-wrap gap-3 pb-3 border-b border-[#1e293b]">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-11 h-11 rounded-2xl flex items-center justify-center text-white font-bold text-base shadow-md flex-shrink-0"
-                          style={{ background: wf.mentorColor || mentor.color }}
-                        >
-                          {wf.mentorAvatar || mentor.avatar}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-bold text-white">{wf.period}</h3>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                              {wf.badge}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-gray-400 mt-0.5">
-                            Evaluated by <strong className="text-white">{wf.mentorName || mentor.name}</strong> ({wf.mentorRole || mentor.role}) • {wf.dateRange}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Rating */}
-                      <div className="flex items-center gap-2 bg-[#0f172a] px-3 py-1.5 rounded-xl border border-[#1e293b]">
-                        <div className="flex items-center text-yellow-400">
-                          {[1, 2, 3, 4, 5].map((s) => (
-                            <Star
-                              key={s}
-                              size={13}
-                              className={s <= Math.floor(wf.rating) ? "fill-yellow-400" : "opacity-30"}
-                            />
-                          ))}
-                        </div>
-                        <span className="text-xs font-bold text-white">{wf.rating} / 5.0</span>
-                      </div>
-                    </div>
-
-                    {/* Mentor's Written Comment */}
-                    <div className="py-3">
-                      <div className="p-3.5 rounded-xl bg-[#070b19] border border-[#1e293b] text-xs text-gray-200 leading-relaxed relative">
-                        <span className="text-purple-400 font-serif text-lg leading-none select-none">“ </span>
-                        {wf.mentorComment}
-                        <span className="text-purple-400 font-serif text-lg leading-none select-none"> ”</span>
-                      </div>
-                    </div>
-
-                    {/* Work Reviewed Pills */}
-                    <div className="flex items-center gap-2 flex-wrap mb-3">
-                      <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                        Reviewed Work:
-                      </span>
-                      {wf.reviewedWork?.map((rw, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0f172a] border border-[#1e293b] text-[11px]"
-                        >
-                          <CheckCircle2 size={11} className="text-green-400" />
-                          <span className="text-gray-300 font-medium">{rw.task}:</span>
-                          <span className="text-cyan-300 font-semibold">{rw.result}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Strengths & Next Week Goals */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                      <div className="p-3 rounded-xl bg-green-950/15 border border-green-500/20 text-xs">
-                        <p className="font-bold text-green-400 mb-1 flex items-center gap-1 text-[11px]">
-                          <ThumbsUp size={12} /> Key Strengths Noted
-                        </p>
-                        <ul className="text-gray-300 space-y-1 text-[11px]">
-                          {wf.keyStrengths?.map((s, idx) => (
-                            <li key={idx}>• {s}</li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      <div className="p-3 rounded-xl bg-purple-950/15 border border-purple-500/20 text-xs">
-                        <p className="font-bold text-purple-300 mb-1 flex items-center gap-1 text-[11px]">
-                          <ArrowRight size={12} /> Mentor Goals for Next Week
-                        </p>
-                        <ul className="text-gray-300 space-y-1 text-[11px]">
-                          {wf.nextWeekGoals?.map((g, idx) => (
-                            <li key={idx}>• {g}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-
-                    {/* Criteria score bar */}
-                    {wf.criteria && (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 mt-3 border-t border-[#1e293b]">
-                        {wf.criteria.map((c, i) => (
-                          <div key={i} className="text-[10px]">
-                            <div className="flex justify-between text-gray-400 mb-0.5">
-                              <span>{c.name}</span>
-                              <span className="text-purple-300 font-bold">{c.score}%</span>
-                            </div>
-                            <div className="w-full h-1 rounded-full bg-[#1e293b] overflow-hidden">
-                              <div
-                                className="h-full rounded-full bg-gradient-to-r from-purple-500 to-cyan-400"
-                                style={{ width: `${c.score}%` }}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+              <div className="space-y-2.5 my-2">
+                {[
+                  { label: "Code Architecture & Logic", score: "4.9 / 5.0", pct: 98 },
+                  { label: "Problem Solving & Speed", score: "4.8 / 5.0", pct: 96 },
+                  { label: "Daily Journals & Communication", score: "4.7 / 5.0", pct: 94 },
+                  { label: "Task Consistency & Attendance", score: "4.9 / 5.0", pct: 98 },
+                ].map((item, idx) => (
+                  <div key={idx} className="bg-[#070B1A] p-2.5 px-3.5 rounded-xl border border-[#1e293b] flex items-center justify-between text-xs">
+                    <span className="text-gray-300 font-medium">{item.label}</span>
+                    <span className="text-purple-300 font-bold">{item.score}</span>
                   </div>
                 ))}
               </div>
             </div>
-          )}
 
-          {/* ═══════════════════════════════════════════════════════════════════ */}
-          {/* SECTION 3: TASK SUBMISSIONS & DETAILED REVIEWS */}
-          {/* ═══════════════════════════════════════════════════════════════════ */}
-          {(activeTab === "overview" || activeTab === "tasks") && (
-            <div className="bg-[#0f172a] border border-[#1e293b] rounded-3xl p-5 shadow-xl space-y-4">
-              <div className="flex items-center justify-between">
+            {/* 2. 15-DAY SKILL TEST PERFORMANCE (Span 6) */}
+            <div className="lg:col-span-6 bg-[#0f172a]/90 border border-[#1e293b] hover:border-cyan-500/30 rounded-3xl p-6 shadow-xl flex flex-col justify-between transition">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center flex-shrink-0">
+                    <Sparkles size={22} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-white">2. 15-Day Skill Test Performance</h2>
+                    <p className="text-xs text-gray-400">Sprint 1 Technical Knowledge Benchmark</p>
+                  </div>
+                </div>
+                {sprint1Test?.completed ? (
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold flex items-center gap-1">
+                    <CheckCircle2 size={13} /> Completed
+                  </span>
+                ) : (
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 font-semibold">
+                    Ready to Take
+                  </span>
+                )}
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#070B1A] border border-[#1e293b] flex items-center justify-between gap-4 my-2">
                 <div>
-                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                    <FileText size={18} className="text-blue-400" /> Individual Task Submissions & Evaluations
-                  </h2>
+                  <div className="text-2xl font-black text-white">
+                    {sprint1Test?.completed ? `${sprint1Test.score}%` : "90%"}
+                    <span className="text-xs text-gray-400 font-normal ml-2">Score</span>
+                  </div>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    Specific task submissions and rubric scoring from mentor evaluations.
+                    {sprint1Test?.completed
+                      ? `Accuracy: ${sprint1Test.correctAnswers}/${sprint1Test.totalQuestions} Questions Correct`
+                      : "18 / 20 Correct Answers (Sprint 1 Milestone)"}
                   </p>
                 </div>
                 <button
-                  onClick={() => router.push("/intern/tasks")}
-                  className="px-3 py-1.5 rounded-xl bg-[#111827] border border-[#1e293b] text-xs font-semibold text-gray-300 hover:text-white transition flex items-center gap-1.5 cursor-pointer"
+                  onClick={() => setIsTestModalOpen(true)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-purple-600 text-white hover:brightness-110 shadow-md cursor-pointer transition flex-shrink-0"
                 >
-                  <ExternalLink size={12} /> Go to Tasks
+                  {sprint1Test?.completed ? "Retake Test" : "Start Test"}
                 </button>
               </div>
+            </div>
 
-              <div className="flex gap-4 min-h-[220px]">
-                {/* Submissions List */}
-                <div className="w-80 min-w-80 flex flex-col gap-2 overflow-y-auto max-h-[300px]">
-                  {evaluations.length === 0 && submissions.length === 0 ? (
-                    <div className="p-4 rounded-2xl bg-[#0b1120] border border-[#1e293b] text-xs text-gray-400 text-center">
-                      No individual task reviews yet. Submit tasks on the Tasks page to generate submission reviews.
-                    </div>
-                  ) : (
-                    [
-                      ...evaluations.map((e) => ({ ...e, _kind: "evaluation", title: e.taskName || `Evaluation by ${e.mentorName || mentor.name}` })),
-                      ...submissions.map((s) => ({ ...s, _kind: "submission", title: s.task || "Task Submission" })),
-                    ].map((item, idx) => {
-                      const active = sel?.id === item.id && sel?._kind === item._kind
-                      return (
-                        <button
-                          key={`${item._kind}-${item.id || idx}`}
-                          onClick={() => setSel(item)}
-                          className="text-left w-full p-3 rounded-xl border transition cursor-pointer"
-                          style={{
-                            background: active ? "rgba(124,58,237,0.15)" : "#0b1120",
-                            borderColor: active ? "rgba(124,58,237,0.5)" : "#1e293b",
-                          }}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-semibold text-white truncate">{item.title}</p>
-                              <p className="text-[10px] text-gray-400 mt-0.5 truncate">
-                                {item.feedback || item.comments || "Verified by mentor"}
-                              </p>
-                            </div>
-                            <span className="text-xs font-bold text-purple-400">
-                              {item.totalScore ?? item.evaluationScore ?? 100}
-                            </span>
-                          </div>
-                        </button>
-                      )
-                    })
-                  )}
+            {/* 4. ASSIGNED MENTOR (Span 6) */}
+            <div className="lg:col-span-6 bg-[#0f172a]/90 border border-[#1e293b] hover:border-purple-500/30 rounded-3xl p-6 shadow-xl flex flex-col justify-between transition">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-purple-600/20 text-purple-400 flex items-center justify-center flex-shrink-0">
+                    <User size={22} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-white">4. Assigned Mentor</h2>
+                    <p className="text-xs text-gray-400">Direct technical guide for {assignedRole}</p>
+                  </div>
                 </div>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-semibold">
+                  Primary Mentor
+                </span>
+              </div>
 
-                {/* Submissions Detail */}
-                <div className="flex-1 bg-[#0b1120] border border-[#1e293b] rounded-2xl p-4 overflow-y-auto max-h-[300px]">
-                  {detail ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between pb-2 border-b border-[#1e293b]">
-                        <div>
-                          <h4 className="text-sm font-bold text-white">{detail.title || detail.task}</h4>
-                          <p className="text-[10px] text-gray-400">
-                            Evaluated by {detail.mentorName || mentor.name}
-                          </p>
-                        </div>
-                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-green-500/20 text-green-400 border border-green-500/30">
-                          Score: {detail.totalScore || detail.evaluationScore || 100}/100
-                        </span>
-                      </div>
+              <div className="p-4 rounded-2xl bg-[#070B1A] border border-[#1e293b] flex items-center justify-between gap-4 my-2">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-r from-cyan-500 to-purple-600 flex items-center justify-center text-lg font-black text-white shadow-md flex-shrink-0">
+                    {mentor.name.charAt(0)}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-white">{mentor.name}</p>
+                    <p className="text-xs text-gray-400">{mentor.role} &bull; {mentor.company}</p>
+                    <p className="text-[11px] text-cyan-300/80 font-mono mt-0.5">{mentor.email}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => router.push("/intern/messages")}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#111827] border border-[#1e293b] text-gray-200 hover:text-white hover:border-cyan-500/40 transition flex items-center gap-1.5 cursor-pointer shadow-sm flex-shrink-0"
+                >
+                  <MessageSquare size={13} /> Message
+                </button>
+              </div>
+            </div>
 
-                      <div className="text-xs text-gray-300">
-                        <p className="text-[11px] text-gray-400 font-semibold mb-1">Mentor Written Notes:</p>
-                        <p className="p-3 rounded-xl bg-[#070b19] border border-[#1e293b] leading-relaxed">
-                          {detail.feedback || detail.comments || "Task completed in full compliance with coding criteria. Modular architecture and documentation approved."}
-                        </p>
-                      </div>
+            {/* 5. WEEKLY MENTOR FEEDBACK (Span 8) */}
+            <div className="lg:col-span-8 bg-[#0f172a]/95 border border-[#1e293b] rounded-3xl p-6 sm:p-7 shadow-xl flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#1e293b]">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center flex-shrink-0">
+                    <MessageSquare size={22} />
+                  </div>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-bold text-white">5. Weekly Mentor Feedback</h2>
+                    <p className="text-xs text-gray-400">Summarized in 1–2 lines with expandable details</p>
+                  </div>
+                </div>
+                <span className="text-xs text-gray-400">
+                  {weeklyFeedback.length} Weekly Reviews Logged
+                </span>
+              </div>
 
-                      {detail.file && (
-                        <div className="flex items-center justify-between text-xs bg-[#0f172a] p-2.5 rounded-xl border border-[#1e293b]">
-                          <span className="flex items-center gap-1.5 text-gray-300">
-                            <FileText size={14} className="text-cyan-400" />
-                            {detail.file} ({detail.fileSize || "180 KB"})
+              <div className="space-y-3.5">
+                {weeklyFeedback.slice(0, 3).map((item) => {
+                  const isExpanded = expandedFeedbackId === item.id
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-4 rounded-2xl bg-[#070B1A] border border-[#1e293b] transition hover:border-[#334155]"
+                    >
+                      {/* Top Header */}
+                      <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-white">{item.weekTitle}</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                            {item.grade}
                           </span>
-                          <button
-                            onClick={() => downloadSubmissionFile(detail)}
-                            className="text-cyan-400 hover:text-white font-semibold text-[11px]"
-                          >
-                            Download
-                          </button>
+                        </div>
+                        <span className="text-xs text-gray-400">{item.date}</span>
+                      </div>
+
+                      {/* 1-2 Lines Feedback */}
+                      <p className={`text-xs text-gray-300 leading-relaxed ${isExpanded ? "" : "line-clamp-2"}`}>
+                        "{item.feedbackText}"
+                      </p>
+
+                      {/* View More / View Less Toggle */}
+                      <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-[#1e293b]/60">
+                        <span className="text-[11px] text-gray-400">
+                          Reviewed by <strong className="text-white">{item.mentorName || mentor.name}</strong>
+                        </span>
+                        <button
+                          onClick={() => toggleFeedbackExpand(item.id)}
+                          className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition cursor-pointer"
+                        >
+                          {isExpanded ? (
+                            <>View Less <ChevronUp size={13} /></>
+                          ) : (
+                            <>View More <ChevronDown size={13} /></>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Expanded Section */}
+                      {isExpanded && (
+                        <div className="mt-3 p-3 rounded-xl bg-[#111827] border border-[#1e293b] text-xs space-y-2">
+                          <div>
+                            <span className="text-emerald-400 font-bold block mb-0.5">Key Strengths:</span>
+                            <span className="text-gray-300">Fast adaptation to backend structure and reliable daily pull requests.</span>
+                          </div>
+                          <div>
+                            <span className="text-yellow-400 font-bold block mb-0.5">Recommendations for Next Week:</span>
+                            <span className="text-gray-300">Focus on database indexing and edge-case testing for authentication tokens.</span>
+                          </div>
                         </div>
                       )}
                     </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-center p-6 text-gray-400">
-                      <FileText size={28} className="mb-2 opacity-40 text-purple-400" />
-                      <p className="text-xs">Select any submission to view detailed rubrics and feedback.</p>
-                    </div>
-                  )}
-                </div>
+                  )
+                })}
               </div>
             </div>
-          )}
+
+            {/* 6. NEXT EVALUATION DATE (Span 4) */}
+            <div className="lg:col-span-4 bg-gradient-to-br from-[#0f172a] to-purple-950/30 border border-purple-500/30 rounded-3xl p-6 sm:p-7 shadow-xl flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-600 flex items-center justify-center text-white flex-shrink-0 shadow-md">
+                    <Calendar size={22} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-white">6. Next Evaluation Date</h2>
+                    <p className="text-xs text-gray-400">Upcoming formal assessment</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#070B1A] border border-[#1e293b] text-center my-3">
+                  <div className="text-xs font-bold text-purple-400 uppercase tracking-wider mb-1">Scheduled Review</div>
+                  <div className="text-xl sm:text-2xl font-black text-white">{nextEval.formatted}</div>
+                  <div className="text-xs text-cyan-300 font-semibold mt-1">At {nextEval.time}</div>
+                  <div className="inline-block mt-3 px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-bold">
+                    ⏳ In {nextEval.daysRemaining} Days
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs text-gray-300 mt-4">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle size={14} className="text-cyan-400 flex-shrink-0 mt-0.5" />
+                    <span>Sprint 2 Code Quality & Architecture Review</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckCircle size={14} className="text-cyan-400 flex-shrink-0 mt-0.5" />
+                    <span>Daily Journal Consistency & Log Analysis</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckCircle size={14} className="text-cyan-400 flex-shrink-0 mt-0.5" />
+                    <span>1-on-1 Milestone Feedback Session with Mentor</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => router.push("/intern/tasks")}
+                className="w-full mt-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 text-xs font-bold text-white hover:brightness-110 shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                Prepare Tasks for Review <ArrowRight size={14} />
+              </button>
+            </div>
+
+          </div>
         </main>
       </div>
 
-      {/* INTERACTIVE 15-DAY MILESTONE TEST MODAL */}
+      {/* MILESTONE TEST MODAL */}
       <MilestoneTestModal
         isOpen={isTestModalOpen}
         onClose={() => setIsTestModalOpen(false)}
-        onTestCompleted={handleTestCompleted}
         role={assignedRole}
-        sprintNumber={activeSprint}
-        testTitle={`Day ${activeSprint * 15} Milestone Assessment (Sprint ${activeSprint})`}
+        sprintNumber={1}
+        onTestCompleted={() => {
+          loadData()
+          setIsTestModalOpen(false)
+        }}
       />
-
-      {/* OFFICIAL MILESTONE CERTIFICATE MODAL */}
-      {certModalData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-2xl bg-gradient-to-b from-[#0e1726] to-[#040812] border-2 border-cyan-500/40 rounded-3xl p-8 shadow-2xl text-white text-center">
-            <button
-              onClick={() => setCertModalData(null)}
-              className="absolute top-4 right-4 w-8 h-8 rounded-xl bg-[#111827] border border-[#1e293b] text-gray-400 hover:text-white flex items-center justify-center"
-            >
-              <X size={16} />
-            </button>
-
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-r from-cyan-500 to-purple-600 shadow-xl shadow-purple-900/40 mb-3">
-              <Award size={32} className="text-white" />
-            </div>
-
-            <p className="text-[11px] uppercase tracking-widest text-cyan-400 font-bold">
-              Internship Milestone Certificate of Achievement
-            </p>
-            <h2 className="text-2xl font-black text-white mt-1">
-              Certificate of Verified Milestone
-            </h2>
-            <div className="w-24 h-0.5 bg-gradient-to-r from-cyan-400 to-purple-500 mx-auto my-3" />
-
-            <p className="text-xs text-gray-400">This officially certifies that</p>
-            <h3 className="text-2xl font-bold text-cyan-300 my-1 font-serif">
-              {certModalData.internName}
-            </h3>
-            <p className="text-xs text-gray-300 max-w-md mx-auto leading-relaxed">
-              Has successfully taken and passed the <strong>{certModalData.milestoneTitle}</strong> in the specialization of <strong>{certModalData.role}</strong> with an evaluated score of <strong>{certModalData.score}% (Grade {certModalData.grade})</strong>.
-            </p>
-
-            <div className="grid grid-cols-2 gap-4 my-6 text-left p-4 rounded-2xl bg-[#090f1d] border border-[#1e293b] text-xs">
-              <div>
-                <p className="text-[10px] text-gray-500 uppercase">Evaluator / Mentor</p>
-                <p className="font-bold text-white mt-0.5">{certModalData.mentorName}</p>
-                <p className="text-[10px] text-gray-400">{certModalData.mentorCompany}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-gray-500 uppercase">Verification ID</p>
-                <p className="font-mono text-cyan-400 mt-0.5">{certModalData.certificateId}</p>
-                <p className="text-[10px] text-gray-400">{certModalData.dateTaken}</p>
-              </div>
-            </div>
-
-            <div className="flex justify-center gap-3">
-              <button
-                onClick={() => setCertModalData(null)}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 text-xs font-bold text-white shadow-lg hover:brightness-110 transition cursor-pointer"
-              >
-                Close Certificate
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -11,6 +11,8 @@ client/out/
 build/
 client/build/
 .vercel/
+*.tsbuildinfo
+client/tsconfig.tsbuildinfo
 
 # Python & Virtual Environments
 __pycache__/

@@ -92,74 +92,98 @@ export default function AssessmentPage() {
     <div className="portal-root flex h-screen w-full max-w-full overflow-hidden text-white bg-[#020617] relative">
       <InternSidebar active="Skill Test" />
 
-      <main className="flex-1 flex flex-col h-screen overflow-y-auto min-w-0 p-4 sm:p-6 lg:p-10 relative">
+      <main className="flex-1 flex flex-col h-screen min-w-0 p-3 sm:p-5 lg:p-8 relative overflow-hidden justify-center">
         {/* Glow ambient background gradients */}
         <div className="absolute top-10 right-10 w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-10 left-10 w-[500px] h-[500px] bg-cyan-600/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="w-full max-w-[1320px] mx-auto my-4 sm:my-6 lg:my-8 rounded-3xl border border-cyan-500/25 bg-[#070B1A]/95 backdrop-blur-xl shadow-2xl overflow-hidden relative z-10 flex flex-col">
-          {/* HEADER */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-white/10 p-6 sm:p-8 bg-[#0a1026]/90 gap-4">
-            <div className="flex items-center gap-4 sm:gap-5">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-r from-cyan-500 to-purple-600 flex items-center justify-center shadow-lg flex-shrink-0">
-                <Award size={28} className="text-white" />
+        <div className="w-full max-w-5xl mx-auto h-[94vh] max-h-[860px] rounded-3xl border border-cyan-500/25 bg-[#070B1A]/95 backdrop-blur-xl shadow-2xl overflow-hidden relative z-10 flex flex-col">
+          {/* HEADER (Sticky / Fixed at top) */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 px-6 sm:px-8 py-4 bg-[#0a1026]/95 gap-3 flex-shrink-0">
+            <div className="flex items-center gap-3.5 sm:gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-r from-cyan-500 to-purple-600 flex items-center justify-center shadow-lg flex-shrink-0">
+                <Award size={24} className="text-white" />
               </div>
               <div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold flex items-center gap-3 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-extrabold flex items-center gap-2.5 flex-wrap">
                   Intern Role Assessment
-                  <span className="text-xs sm:text-sm px-3.5 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-semibold shadow-sm">
+                  <span className="text-xs px-3 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-semibold shadow-sm">
                     16 Questions
                   </span>
                 </h1>
-                <p className="text-sm sm:text-base text-gray-300 mt-1">
+                <p className="text-xs sm:text-sm text-gray-300 mt-0.5">
                   Assess your technical skills to automatically assign your specialization role and tasks.
                 </p>
               </div>
             </div>
 
             {existingRole && !showResult && (
-              <div className="flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-purple-500/15 border border-purple-500/30 text-purple-300 text-sm font-semibold self-start md:self-auto shadow-sm">
-                <ShieldCheck size={18} /> Current: {existingRole}
+              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs sm:text-sm font-semibold self-start sm:self-auto shadow-sm">
+                <ShieldCheck size={16} /> Current: {existingRole}
               </div>
             )}
           </div>
 
-          {/* PROGRESS */}
+          {/* PROGRESS & NUMBERED JUMP NAVIGATION (Always visible) */}
           {!showResult && (
-            <div className="px-6 sm:px-8 pt-6 pb-4 bg-[#070B1A]">
-              <div className="flex items-center justify-between text-sm sm:text-base text-gray-300 mb-2.5 font-medium">
+            <div className="px-6 sm:px-8 pt-3.5 pb-2.5 bg-[#070B1A] border-b border-white/5 flex-shrink-0">
+              <div className="flex items-center justify-between text-xs sm:text-sm text-gray-300 mb-2 font-medium">
                 <span>Question {currentIdx + 1} of {totalQ}</span>
                 <span className="text-cyan-400 font-bold">{answeredCount}/{totalQ} Answered ({progressPct}%)</span>
               </div>
-              <div className="w-full h-2.5 sm:h-3 bg-white/10 rounded-full overflow-hidden shadow-inner">
+              <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden shadow-inner mb-3">
                 <div
                   className="h-full bg-gradient-to-r from-cyan-400 via-indigo-500 to-purple-500 transition-all duration-300 rounded-full shadow-[0_0_12px_rgba(6,182,212,0.5)]"
                   style={{ width: `${((currentIdx + 1) / totalQ) * 100}%` }}
                 />
               </div>
+
+              {/* Numbered Jump Buttons */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                {ASSESSMENT_QUESTIONS.map((q, idx) => {
+                  const isAns = answers[q.id] !== undefined
+                  const isCur = idx === currentIdx
+                  return (
+                    <button
+                      key={q.id}
+                      onClick={() => setCurrentIdx(idx)}
+                      className={`min-w-[34px] h-[34px] px-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center flex-shrink-0 shadow-sm cursor-pointer ${
+                        isCur
+                          ? "ring-2 ring-cyan-400/80 bg-gradient-to-r from-cyan-400 to-cyan-500 text-black font-black scale-105 shadow-md shadow-cyan-500/30"
+                          : isAns
+                          ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold border border-purple-400/40"
+                          : "bg-white/[0.05] text-gray-400 border border-white/10 hover:bg-white/[0.1] hover:text-white"
+                      }`}
+                      title={`Jump to Question ${idx + 1}`}
+                    >
+                      {idx + 1}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           )}
 
-          {/* QUESTION OR RESULT BODY */}
-          <div className="p-6 sm:p-8 lg:p-10 flex-1">
+          {/* QUESTION OR RESULT BODY (Independently scrollable) */}
+          <div className="p-6 sm:p-8 flex-1 overflow-y-auto">
             {!showResult ? (
-              <div>
+              <div className="max-w-3xl mx-auto">
                 {/* Domain Pill */}
-                <div className="flex items-center gap-3 mb-5">
-                  <span className="flex items-center gap-2 text-xs sm:text-sm font-semibold px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-gray-200">
+                <div className="flex items-center gap-2.5 mb-4">
+                  <span className="flex items-center gap-2 text-xs sm:text-sm font-semibold px-3 py-1 rounded-xl bg-white/5 border border-white/10 text-gray-200">
                     {getDomainIcon(currentQ.domain)}
                     {currentQ.subject}
                   </span>
-                  <span className="text-xs sm:text-sm text-gray-400 font-mono">Q{currentQ.id} of 16</span>
+                  <span className="text-xs text-gray-400 font-mono">Question {currentIdx + 1} of {totalQ}</span>
                 </div>
 
                 {/* Question */}
-                <h2 className="text-xl sm:text-2xl lg:text-[26px] font-bold leading-relaxed mb-8 text-white">
+                <h2 className="text-lg sm:text-xl lg:text-2xl font-bold leading-relaxed mb-6 text-white">
                   {currentQ.question}
                 </h2>
 
                 {/* Options List */}
-                <div className="space-y-4 mb-8">
+                <div className="space-y-3.5 mb-4">
                   {currentQ.options.map((opt, idx) => {
                     const isSelected = answers[currentQ.id] === idx
                     const optionLabel = ["A", "B", "C", "D"][idx]
@@ -167,14 +191,14 @@ export default function AssessmentPage() {
                       <div
                         key={idx}
                         onClick={() => handleSelectOption(currentQ.id, idx)}
-                        className={`group flex items-center gap-4 sm:gap-5 p-4 sm:p-5 lg:p-6 rounded-2xl border transition-all cursor-pointer min-h-[58px] sm:min-h-[64px] ${
+                        className={`group flex items-start gap-3.5 sm:gap-4 p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer ${
                           isSelected
-                            ? "bg-gradient-to-r from-cyan-500/15 via-purple-600/15 to-transparent border-cyan-400/80 shadow-[0_0_24px_rgba(6,182,212,0.25)] scale-[1.008]"
+                            ? "bg-gradient-to-r from-cyan-500/15 via-purple-600/15 to-transparent border-cyan-400/80 shadow-[0_0_20px_rgba(6,182,212,0.25)]"
                             : "bg-white/[0.03] border-white/10 hover:bg-white/[0.07] hover:border-white/25"
                         }`}
                       >
                         <div
-                          className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-sm sm:text-base font-bold transition flex-shrink-0 shadow-sm ${
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs sm:text-sm font-bold transition flex-shrink-0 mt-0.5 shadow-sm ${
                             isSelected
                               ? "bg-gradient-to-r from-cyan-500 to-purple-600 text-white shadow-md"
                               : "bg-white/10 text-gray-400 group-hover:text-white"
@@ -182,33 +206,10 @@ export default function AssessmentPage() {
                         >
                           {optionLabel}
                         </div>
-                        <span className={`text-base sm:text-lg leading-relaxed ${isSelected ? "text-white font-semibold" : "text-gray-200"}`}>
+                        <span className={`text-sm sm:text-base leading-relaxed ${isSelected ? "text-white font-semibold" : "text-gray-200"}`}>
                           {opt}
                         </span>
                       </div>
-                    )
-                  })}
-                </div>
-
-                {/* Numbered Jump Buttons */}
-                <div className="flex items-center justify-center gap-2.5 sm:gap-3 py-4 mb-4 flex-wrap overflow-x-auto">
-                  {ASSESSMENT_QUESTIONS.map((q, idx) => {
-                    const isAns = answers[q.id] !== undefined
-                    const isCur = idx === currentIdx
-                    return (
-                      <button
-                        key={q.id}
-                        onClick={() => setCurrentIdx(idx)}
-                        className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl text-sm sm:text-base font-bold transition shadow-sm ${
-                          isCur
-                            ? "ring-4 ring-cyan-400/40 bg-gradient-to-r from-cyan-400 to-cyan-500 text-black font-extrabold scale-110 shadow-lg shadow-cyan-500/30"
-                            : isAns
-                            ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold border border-purple-400/40 shadow-sm"
-                            : "bg-white/[0.04] text-gray-400 border border-white/10 hover:bg-white/[0.08] hover:text-white"
-                        }`}
-                      >
-                        {idx + 1}
-                      </button>
                     )
                   })}
                 </div>
@@ -274,8 +275,8 @@ export default function AssessmentPage() {
             )}
           </div>
 
-          {/* FOOTER */}
-          <div className="flex items-center justify-between border-t border-white/10 px-6 sm:px-8 py-5 sm:py-6 bg-[#0a1026]/90 gap-4">
+          {/* FOOTER (Always accessible and visible at bottom) */}
+          <div className="flex items-center justify-between border-t border-white/10 px-6 sm:px-8 py-4 sm:py-4.5 bg-[#0a1026]/95 gap-4 flex-shrink-0 z-20">
             {!showResult ? (
               <>
                 <button

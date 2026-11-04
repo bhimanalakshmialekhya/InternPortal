@@ -148,13 +148,15 @@ export default function MentorPage() {
     } catch { }
   }
 
-  const connect = async (id) => {
+  const connect = async (mentor) => {
+    const id = mentor.id
     setConnecting(id)
     const user = getUser()
     await api.connect(id, { internId: user.id }).catch(() => { })
     setMentors(p => p.map(m => m.id === id ? { ...m, upcoming: m.upcoming + 1 } : m))
     setConnectedMentors(p => ({ ...p, [id]: true }))
     setConnecting(null)
+    openMentorChat(mentor)
   }
 
   const openMentorChat = (mentor) => {
@@ -365,175 +367,156 @@ export default function MentorPage() {
             </p>
           </div>
 
-          {/* MENTORS TABLE */}
-          <div className="bg-[#0f172a]/90 backdrop-blur-md border border-[#1e293b] rounded-2xl overflow-hidden shadow-xl">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse min-w-[850px]">
-                <thead>
-                  <tr className="border-b border-[#1e293b] bg-[#111827]/80">
-                    {["Mentor", "Track Expertise", "Availability Status", "Experience", "Sessions", "Action"].map(h => (
-                      <th key={h} className="text-left px-5 py-4 text-xs text-gray-400 font-semibold uppercase tracking-wider">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#1e293b]/60">
-                  {filteredMentors.map(m => {
-                    const isAvailable = m.roleDetails.isAvailableForRole
-                    const isPrimary = m.roleDetails.isPrimary
-                    const isConnected = !!connectedMentors[m.id]
+          {/* MENTORS LIST (Independently scrollable & responsive) */}
+          <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-1 pb-6 min-h-[350px]">
+            {filteredMentors.map(m => {
+              const isAvailable = m.roleDetails.isAvailableForRole
+              const isPrimary = m.roleDetails.isPrimary
+              const isConnected = !!connectedMentors[m.id]
+              const isExpanded = expandedId === m.id
 
-                    return (
-                      <React.Fragment key={m.id}>
-                        <tr
-                          className={`transition cursor-pointer ${isPrimary
-                            ? "bg-purple-950/20 border-l-4 border-l-cyan-400 hover:bg-purple-900/30"
-                            : isAvailable
-                              ? "bg-cyan-950/10 border-l-2 border-l-purple-500 hover:bg-cyan-900/20"
-                              : "opacity-80 hover:opacity-100 hover:bg-[#1e293b]/30"
-                            }`}
-                          onClick={() => setExpandedId(expandedId === m.id ? null : m.id)}
-                        >
-                          {/* Mentor Info */}
-                          <td className="px-5 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-sm font-bold flex-shrink-0 relative shadow-sm" style={{ background: m.color + "33", color: m.color }}>
-                                {m.avatar}
-                                {isAvailable && (
-                                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-green-400 border-2 border-[#0f172a] shadow-sm"></span>
-                                )}
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <p className="text-sm font-bold text-white">{m.name}</p>
-                                  {isPrimary && (
-                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-cyan-400 to-purple-500 text-black shadow-sm">
-                                      ⭐ Primary
-                                    </span>
-                                  )}
-                                  {!isPrimary && isAvailable && (
-                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                                      Cross-Track
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-gray-300 font-medium mt-0.5">{m.role}</p>
-                                <p className="text-xs text-gray-500">{m.company}</p>
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Expertise */}
-                          <td className="px-5 py-4">
-                            <div className="flex flex-wrap gap-1.5 max-w-xs">
-                              {m.expertise.map(e => (
-                                <span key={e} className="px-2 py-1 rounded-lg text-xs font-semibold" style={{ background: (EX_COLORS[e] || "#7C3AED") + "22", color: EX_COLORS[e] || "#7C3AED" }}>
-                                  {e}
-                                </span>
-                              ))}
-                            </div>
-                          </td>
-
-                          {/* Availability based on Intern Role */}
-                          <td className="px-5 py-4">
-                            <p className="text-xs text-white whitespace-pre-line leading-relaxed">{m.availability}</p>
-                            <div className="mt-1.5 flex items-center gap-2">
-                              {isAvailable ? (
-                                <span className="text-xs font-bold text-green-400 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-                                  <span>Available for {currentRole.split(" ")[0]}</span>
-                                </span>
-                              ) : (
-                                <span className="text-xs text-gray-400 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-gray-500"></span>
-                                  <span>Dedicated to {m.role.split(" ")[0]} Track</span>
-                                </span>
-                              )}
-                            </div>
-                          </td>
-
-                          {/* Experience */}
-                          <td className="px-5 py-4 text-sm text-white font-semibold">{m.experience}</td>
-
-                          {/* Sessions */}
-                          <td className="px-5 py-4">
-                            <p className="text-sm text-white font-bold">{m.completed} Completed</p>
-                            <p className="text-xs text-gray-400 mt-0.5">{m.upcoming} Upcoming</p>
-                          </td>
-
-                          {/* Actions */}
-                          <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
-                            <div className="flex gap-2.5 items-center">
-                              <button
-                                onClick={() => connect(m.id)}
-                                disabled={connecting === m.id || isConnected}
-                                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition ${isConnected
-                                  ? "bg-green-500/20 text-green-400 border border-green-500/30 cursor-default"
-                                  : isAvailable
-                                    ? "bg-gradient-to-r from-cyan-500 to-purple-600 text-white hover:opacity-90 shadow-md"
-                                    : "bg-[#1e293b] text-gray-400 hover:text-white border border-[#334155]"
-                                  }`}
-                              >
-                                {connecting === m.id ? "Connecting…" : isConnected ? "Connected ✓" : isAvailable ? "Connect" : "Request Sync"}
-                              </button>
-
-                              <button
-                                onClick={() => openMentorChat(m)}
-                                className="w-9 h-9 rounded-xl bg-[#111827] border border-[#1e293b] flex items-center justify-center hover:bg-[#1e293b] hover:border-cyan-500/40 transition shadow-sm"
-                                title={`Chat with ${m.name}`}
-                              >
-                                <MessageSquare size={15} className="text-gray-300 hover:text-cyan-400" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-
-                        {/* EXPANDED DETAILS */}
-                        {expandedId === m.id && (
-                          <tr className="bg-purple-950/20 border-b border-[#1e293b]">
-                            <td colSpan={6} className="px-6 py-5">
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="bg-[#111827] rounded-2xl p-4 border border-[#1e293b] shadow-md">
-                                  <p className="text-xs text-gray-400 mb-1.5 font-bold uppercase tracking-wider">Mentor Overview</p>
-                                  <p className="text-xs sm:text-sm text-gray-200 leading-relaxed">
-                                    {m.name} is a {m.role} at {m.company} with {m.experience} of industry experience.
-                                  </p>
-                                  <p className="text-xs text-cyan-300 mt-2.5 font-semibold">
-                                    {isPrimary ? "🎯 Assigned as your primary direct mentor." : isAvailable ? "💡 Available for cross-functional support." : "🔒 Assigned primarily to other intern cohorts."}
-                                  </p>
-                                </div>
-                                <div className="bg-[#111827] rounded-2xl p-4 border border-[#1e293b] shadow-md">
-                                  <p className="text-xs text-gray-400 mb-2.5 font-bold uppercase tracking-wider">Core Tech Stack</p>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {m.expertise.map(e => (
-                                      <span key={e} className="px-2.5 py-1 rounded-lg text-xs font-semibold" style={{ background: (EX_COLORS[e] || "#7C3AED") + "22", color: EX_COLORS[e] || "#7C3AED" }}>
-                                        {e}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                                <div className="bg-[#111827] rounded-2xl p-4 border border-[#1e293b] shadow-md">
-                                  <p className="text-xs text-gray-400 mb-1.5 font-bold uppercase tracking-wider">Session Track Record</p>
-                                  <p className="text-2xl font-black text-white">{m.completed + m.upcoming}</p>
-                                  <p className="text-xs text-gray-400 mt-1">{m.completed} completed &bull; {m.upcoming} upcoming reviews</p>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
+              return (
+                <div
+                  key={m.id}
+                  className={`rounded-2xl border p-5 sm:p-6 transition-all shadow-lg flex flex-col gap-4 ${
+                    isPrimary
+                      ? "bg-[#0f172a]/95 border-cyan-400/60 shadow-[0_0_20px_rgba(6,182,212,0.15)] ring-1 ring-cyan-400/30"
+                      : isAvailable
+                      ? "bg-[#0f172a]/90 border-purple-500/30 hover:border-purple-400/60"
+                      : "bg-[#0b1120]/80 border-[#1e293b] opacity-90 hover:opacity-100"
+                  }`}
+                >
+                  {/* Top Row: Mentor Avatar, Name, Company, Role, Badges */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div
+                        className="w-13 h-13 rounded-2xl flex items-center justify-center text-lg font-black flex-shrink-0 relative shadow-md"
+                        style={{ background: m.color + "33", color: m.color }}
+                      >
+                        {m.avatar}
+                        {isAvailable && (
+                          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-green-400 border-2 border-[#0f172a] shadow-sm"></span>
                         )}
-                      </React.Fragment>
-                    )
-                  })}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-base sm:text-lg font-bold text-white truncate">{m.name}</h3>
+                          {isPrimary && (
+                            <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-cyan-400 to-purple-500 text-black shadow-sm">
+                              ⭐ Primary Mentor
+                            </span>
+                          )}
+                          {!isPrimary && isAvailable && (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                              Role Aligned
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs sm:text-sm text-gray-300 font-medium mt-0.5">
+                          {m.role} &bull; <span className="text-gray-400">{m.company}</span>
+                        </p>
+                      </div>
+                    </div>
 
-                  {filteredMentors.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="text-center py-12 text-gray-400 text-sm">
-                        No mentors match the selected criteria.
-                      </td>
-                    </tr>
+                    {/* Actions */}
+                    <div className="flex items-center gap-2.5 self-start sm:self-center flex-shrink-0">
+                      <button
+                        onClick={() => connect(m)}
+                        disabled={connecting === m.id || isConnected}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md ${
+                          isConnected
+                            ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                            : isAvailable
+                            ? "bg-gradient-to-r from-cyan-500 to-purple-600 text-white hover:brightness-110 shadow-purple-600/20"
+                            : "bg-[#1e293b] text-gray-300 hover:text-white border border-[#334155]"
+                        }`}
+                      >
+                        {connecting === m.id ? "Connecting…" : isConnected ? "Connected ✓" : isAvailable ? "Connect" : "Request Sync"}
+                      </button>
+
+                      <button
+                        onClick={() => openMentorChat(m)}
+                        className="w-9 h-9 rounded-xl bg-[#111827] border border-[#1e293b] flex items-center justify-center hover:bg-[#1e293b] hover:border-cyan-500/40 text-gray-300 hover:text-cyan-400 transition shadow-sm cursor-pointer"
+                        title={`Message ${m.name}`}
+                      >
+                        <MessageSquare size={16} />
+                      </button>
+
+                      <button
+                        onClick={() => setExpandedId(isExpanded ? null : m.id)}
+                        className="px-3 py-2 rounded-xl bg-[#111827] border border-[#1e293b] text-xs font-medium text-gray-400 hover:text-white transition cursor-pointer"
+                      >
+                        {isExpanded ? "Hide Details" : "Details"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Middle Row: Tech Stack, Availability, Experience, Sessions */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3.5 border-t border-[#1e293b]/70 text-xs">
+                    <div>
+                      <span className="text-gray-400 text-[11px] font-semibold block mb-1.5">Tech Specialization:</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {m.expertise.map(e => (
+                          <span
+                            key={e}
+                            className="px-2.5 py-0.5 rounded-lg text-[11px] font-semibold"
+                            style={{ background: (EX_COLORS[e] || "#7C3AED") + "22", color: EX_COLORS[e] || "#7C3AED" }}
+                          >
+                            {e}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-gray-400 text-[11px] font-semibold block mb-1">Availability Hours:</span>
+                      <span className="text-gray-200 font-medium whitespace-pre-line leading-relaxed">{m.availability}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between md:justify-end gap-6 md:text-right">
+                      <div>
+                        <span className="text-gray-400 text-[11px] font-semibold block mb-0.5">Experience:</span>
+                        <span className="text-white font-bold">{m.experience}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 text-[11px] font-semibold block mb-0.5">Milestones:</span>
+                        <span className="text-cyan-300 font-bold">{m.completed} Completed &bull; {m.upcoming} Upcoming</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Expanded Details */}
+                  {isExpanded && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-3.5 border-t border-[#1e293b] text-xs">
+                      <div className="bg-[#0b1120] p-4 rounded-xl border border-[#1e293b]">
+                        <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Mentor Overview</p>
+                        <p className="text-gray-300 leading-relaxed">
+                          {m.name} is a {m.role} at {m.company} with {m.experience} of industry experience guiding intern engineering cohorts.
+                        </p>
+                      </div>
+                      <div className="bg-[#0b1120] p-4 rounded-xl border border-[#1e293b]">
+                        <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Role Track Guidance</p>
+                        <p className="text-cyan-300 leading-relaxed font-medium">
+                          {isPrimary ? "⭐ Assigned as your primary direct mentor." : isAvailable ? "💡 Available for cross-track reviews & consultations." : "Assigned primarily to other intern cohorts."}
+                        </p>
+                      </div>
+                      <div className="bg-[#0b1120] p-4 rounded-xl border border-[#1e293b]">
+                        <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Track Record</p>
+                        <p className="text-gray-300 leading-relaxed">
+                          Conducted {m.completed + m.upcoming} mentorship sessions with consistent positive intern ratings.
+                        </p>
+                      </div>
+                    </div>
                   )}
-                </tbody>
-              </table>
-            </div>
+                </div>
+              )
+            })}
+
+            {filteredMentors.length === 0 && (
+              <div className="text-center py-12 text-gray-400 text-sm bg-[#0f172a]/60 rounded-2xl border border-[#1e293b]">
+                No mentors match the selected criteria. Try adjusting your search or switching to "All Mentors".
+              </div>
+            )}
           </div>
         </main>
 
